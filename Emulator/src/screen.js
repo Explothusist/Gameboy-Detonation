@@ -432,6 +432,7 @@ let dot_on_line = 0;
 let background_tile_line = [];
 let background_line_y = -8;
 let window_tile_line = [];
+let window_internal_line_counter = 0;
 let window_line_y = -8;
 let sprite_tile_line = [];
 let sprite_line_y = -8;
@@ -439,7 +440,10 @@ let sprite_line_y = -8;
 function load_new_window_tile_line(pixel_y, xff, read) {
     let window_pixel_x = xff[0x4b] - 7;
     let window_pixel_y = xff[0x4a];
-    let window_tile_y = Math.floor((pixel_y-window_pixel_y) / 8);
+    // Because of hardware quirks, the window is less intelligent than this
+    let real_window_tile_y = Math.floor((pixel_y-window_pixel_y) / 8);
+    // If the window is half-drawn, then moved, it still picks up where it left off
+    let window_tile_y = window_internal_line_counter;
 
     // Reset 
     window_tile_line = []; // (x, mody) -> [mody][x]
@@ -465,7 +469,8 @@ function load_new_window_tile_line(pixel_y, xff, read) {
         }
     }
 
-    window_line_y = window_pixel_y + (window_tile_y*8);
+    window_internal_line_counter += 1;
+    window_line_y = window_pixel_y + (real_window_tile_y*8);
 };
 
 function load_new_background_tile_line(pixel_y, xff, read) {
@@ -744,6 +749,7 @@ function reset_screen_drawing() {
     background_line_y = -8;
     window_tile_line = [];
     window_line_y = -8;
+    window_internal_line_counter = 0;
     sprite_tile_line = [];
     sprite_line_y = -8;
 };
