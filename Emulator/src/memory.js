@@ -42,7 +42,7 @@ let rumble_on = 0;
 
 let dma = 0;
 
-let testrom = true;
+let testrom = false;
 let lastff01 = 0;
 let trommess = "";
 
