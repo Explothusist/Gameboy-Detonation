@@ -497,6 +497,7 @@ function dma_trans(pos) {
     for (let i = 0; i < 0x9f; i++) {
         XFE00[i] = read(addr + i);
     }
+    dma = 1;
     console.log("DMA Transfer Complete");
 }
 

@@ -433,13 +433,15 @@ let background_tile_line = [];
 let background_line_y = -8;
 let window_tile_line = [];
 let window_line_y = -8;
-let loaded_sprites = [];
+let sprite_tile_line = [];
+let sprite_line_y = -8;
 
-function load_new_window_tile_line(pixel_y) {
+function load_new_window_tile_line(pixel_y, xff, read) {
     let window_pixel_x = xff[0x4b] - 7;
     let window_pixel_y = xff[0x4a];
     let window_tile_y = Math.floor((pixel_y-window_pixel_y) / 8);
 
+    // Reset 
     window_tile_line = []; // (x, mody) -> [mody][x]
     for (let i = 0; i < 8; i++) {
         window_tile_line.push([]);
@@ -448,21 +450,170 @@ function load_new_window_tile_line(pixel_y) {
         }
     }
 
+    // Unlike load_new_background_tile_line, i only iterates over screen after start of window
     for (let i = 0; window_pixel_x+(i*8) < screen_width; i++) {
         let window_tile_x = i;
-        let current_tile = load_tile(read(background_display + (window_tile_y*32) + window_tile_x, 0), read, background_window_tile, false);
+        let current_tile = load_tile(read(window_display + (window_tile_y*32) + window_tile_x, 0), read, background_window_tile, false);
 
         for (let j = 0; j < 8; j++) {// y within current_tile
             for (let k = 0; k < 8; k++) { // x within current_tile
                 // Test for overflow offscreen
                 if (window_pixel_x+(window_tile_x*8)+k < screen_width) {
-                    window_tile_line[j][window_pixel_x+(window_tile_x*8)+k] = bgpalette[current_tile[j][k]];
+                    window_tile_line[j][window_pixel_x+(window_tile_x*8)+k] = current_tile[j][k];
                 }
             }
         }
     }
 
     window_line_y = window_pixel_y + (window_tile_y*8);
+};
+
+function load_new_background_tile_line(pixel_y, xff, read) {
+    let background_pixel_x = xff[0x43];
+    let background_pixel_y = xff[0x42];
+    // This is the what is cut off by rounding in background_tile_x
+    // Applied to current_tile_x later so we don't have to keep track of pixel_x with background_pixel_x
+    let background_pixel_xshift = ((background_pixel_x + 256) % 8);
+    let background_pixel_yshift = ((background_pixel_y + 256) % 8);
+    // This can give a negative value
+    let background_tile_x = Math.floor((-background_pixel_x) / 8);
+    let background_tile_y = Math.floor((pixel_y+background_pixel_y) / 8);
+    // Use mod to implement the wrap around
+    background_tile_x = (background_tile_x + 32) % 32;
+    background_tile_y = (background_tile_y + 32) % 32;
+
+    // Reset 
+    background_tile_line = []; // (x, mody) -> [mody][x]
+    for (let i = 0; i < 8; i++) {
+        background_tile_line.push([]);
+        for (let j = 0; j < screen_width; j++) {
+            background_tile_line[i].push("#000000");
+        }
+    }
+
+    for (let i = 0; i < 32; i++) {
+        let current_tile_x = i;
+        let curr_pixel_x = (current_tile_x*8)-background_pixel_x;
+        curr_pixel_x = (curr_pixel_x+256) % 256;
+        
+        let current_tile = load_tile(read(background_display + (background_tile_y*32) + current_tile_x, 0), read, background_window_tile, false);
+        
+        for (let j = 0; j < 8; j++) {// y within current_tile
+            for (let k = 0; k < 8; k++) { // x within current_tile
+                let pixel_x = curr_pixel_x+k;
+                pixel_x = (pixel_x + 256) % 256;
+                // Test for overflow offscreen
+                if (pixel_x >= 0 && pixel_x < screen_width) {
+                    background_tile_line[j][pixel_x] = current_tile[j][k];
+                }
+            }
+        }
+    }
+
+    let line = -background_pixel_yshift;
+    while (line <= pixel_y) {
+        line += 8;
+    }
+    background_line_y = line-8;
+};
+
+function load_new_sprite_tile_line(pixel_y, xff, read) {
+    let sprites = [];
+    // Retreive first 10 sprites which overlap this scanline
+    for (let i = 0; i < 0x9f && sprites.length <= 9; i += 4) {
+        let y = read(0xfe00 + i, 0);
+        // (y-16) because of gameboy hardware setup for offscreen upward
+        if (pixel_y >= (y-16) && pixel_y < (y-16)+sprite_size) {
+            let x = read(0xfe01 + i, 0);
+            if (x > 0 && x < 168 && y > 0 && y < 160) {
+                sprites.push([x, y, i]);
+            }
+        }
+    }
+    sprites.sort(function (a, b) {
+        return a[0] - b[0];
+    });
+
+    sprite_tile_line = [];
+    for (let i = 0; i < screen_width; i++) {
+        sprite_tile_line.push({pixel: "#000000", sprite: false, over: true});
+    }
+
+    for (let i = 0; i < sprites.length; i++) {
+        let sprite_y = sprites[i][1] - 16;
+        let sprite_x = sprites[i][0] - 8;
+        let sprite_source = read(0xfe02 + sprites[i][2], 0);
+        let sprite_attribute = read(0xfe03 + sprites[i][2], 0);
+        let over = true;
+        let palette = palette1;
+        if (((sprite_attribute & 0b1000_0000) >> 7) === 1) {
+            over = false;
+        }
+        if (((sprite_attribute & 0b0001_0000) >> 4) === 1) {
+            palette = palette2;
+        }
+        let flip = [false, false]; // [x, y]
+        if (((sprite_attribute & 0b0100_0000) >> 6) === 1) {
+            flip[1] = true; // y-flip
+        }
+        if (((sprite_attribute & 0b0010_0000) >> 5) === 1) {
+            flip[0] = true; // x-flip
+        }
+        
+        if (sprite_size === 8) {
+            // 8x8
+            let current_sprite = load_tile(sprite_source, read, null, true);
+            if (flip[0]) { // x-flip
+                for (let j = 0; j < current_sprite.length; j++) {
+                    current_sprite[j].reverse();
+                }
+            }
+            if (flip[1]) { // y-flip
+                current_sprite.reverse();
+            }
+            for (let j = 0; j < 8; j++) { // looping through x in current_sprite
+                if (sprite_x+j >= 0 && sprite_x+j < screen_width) {
+                    // Making sure another sprite was not already drawn there and that this one isn't transparent
+                    if (!sprite_tile_line[sprite_x+j].sprite && current_sprite[pixel_y-sprite_y][j] !== 0) {
+                        sprite_tile_line[sprite_x+j] = {pixel: current_sprite[pixel_y-sprite_y][j], palette: palette, sprite: true, over: over};
+                    }
+                }
+            }
+        }else {
+            // 8x16
+            let current_sprite1 = load_tile((sprite_source & 0xfe), read, null, true);
+            let current_sprite2 = load_tile((sprite_source | 0x01), read, null, true);
+            if (flip[0]) { // x-flip
+                for (let j = 0; j < current_sprite1.length; j++) {
+                    current_sprite1[j].reverse();
+                }
+                for (let j = 0; j < current_sprite2.length; j++) {
+                    current_sprite2[j].reverse();
+                }
+            }
+            if (flip[1]) { // y-flip
+                let store_sprite = current_sprite1.reverse();
+                current_sprite1 = current_sprite2.reverse();
+                current_sprite2 = store_sprite;
+            }
+            let y_pos_in_sprite = pixel_y-sprite_y;
+            let current_sprite = current_sprite1;
+            if (y_pos_in_sprite >= 8) {
+                current_sprite = current_sprite2;
+                y_pos_in_sprite -= 8;
+            }
+            for (let j = 0; j < 8; j++) { // looping through x in current_sprite
+                if (sprite_x+j >= 0 && sprite_x+j < screen_width) {
+                    // Making sure another sprite was not already drawn there and that this one isn't transparent
+                    if (!sprite_tile_line[sprite_x+j].sprite && current_sprite[y_pos_in_sprite][j] !== 0) {
+                        sprite_tile_line[sprite_x+j] = {pixel: current_sprite[y_pos_in_sprite][j], palette: palette, sprite: true, over: over};
+                    }
+                }
+            }
+        }
+    }
+
+    sprite_line_y = pixel_y;
 };
 
 function draw_dots(dots, xff, read) {
@@ -495,7 +646,7 @@ function draw_dots(dots, xff, read) {
 
                     // First determine pixel of background or window
                     let is_background_pixel = false;
-                    let background_pixel = "#000000";
+                    let background_pixel = 0;
                     // If window is enabled and on screen, it takes precedence over background
                     if (window_enabled) {
                         let window_pixel_x = xff[0x4b] - 7;
@@ -503,14 +654,72 @@ function draw_dots(dots, xff, read) {
                         
                         // Test if current pixel is inside window
                         if (window_pixel_x <= pixel_x && window_pixel_y <= pixel_y) {
-                            is_background_pixel = true;
-
                             // Test if we have left the preloaded window tiles
                             if (pixel_y >= window_line_y+8) {
-                                load_new_window_tile_line(pixel_y);
+                                load_new_window_tile_line(pixel_y, xff, read);
+                            }
+
+                            is_background_pixel = true;
+                            // Pre-loaded array has not yet passed through palette
+                            background_pixel = window_tile_line[pixel_y-window_line_y][pixel_x];
+                        }
+                    }
+                    // Use background if it is enabled and window is not already setting
+                    if (background_enabled && !is_background_pixel) {
+                        // Test if we have left the preloaded window tiles
+                        if (pixel_y >= background_line_y+8) {
+                            load_new_background_tile_line(pixel_y, xff, read);
+                        }
+
+                        is_background_pixel = true;
+                        // Pre-loaded array has not yet passed through palette
+                        if (pixel_y-background_line_y >= 8 || pixel_y-background_line_y < 0) {
+                            alert(pixel_y+", "+background_line_y);
+                        }
+                        background_pixel = background_tile_line[pixel_y-background_line_y][pixel_x];
+                    }
+
+                    // Second, determine pixel of sprite, if there is one
+                    let is_sprite_pixel = false;
+                    let sprite_pixel = 0;
+                    let sprite_pixel_over = true;
+                    let sprite_palette = [];
+                    if (sprite_enabled) {
+                        //Test if we have loaded this line's sprites
+                        if (pixel_y !== sprite_line_y) {
+                            load_new_sprite_tile_line(pixel_y, xff, read);
+                        }
+
+                        if (sprite_tile_line[pixel_x].sprite) {
+                            sprite_pixel = sprite_tile_line[pixel_x].pixel;
+                            is_sprite_pixel = true;
+                            sprite_pixel_over = sprite_tile_line[pixel_x].over;
+                            sprite_palette = sprite_tile_line[pixel_x].palette;
+                        }
+                    }
+
+                    // Compare pixels and test which to draw
+                    let pixel = "#000000";
+                    if (sprite_pixel_over) {
+                        if (is_sprite_pixel && sprite_pixel !== 0) {
+                            pixel = sprite_palette[sprite_pixel];
+                        }else {
+                            pixel = bgpalette[background_pixel];
+                        }
+                    }else {
+                        if (background_pixel !== 0) {
+                            pixel = bgpalette[background_pixel];
+                        }else {
+                            if (is_sprite_pixel && sprite_pixel !== 0) {
+                                pixel = sprite_palette[sprite_pixel];
+                            }else {
+                                pixel = bgpalette[background_pixel];
                             }
                         }
                     }
+
+                    scr_ddraw.fillStyle = pixel;
+                    scr_ddraw.fillRect(pixel_x * scale, pixel_y * scale, scale, scale);
                 }
             }
         }
@@ -526,4 +735,15 @@ function draw_dots(dots, xff, read) {
             }
         }
     }
+};
+
+function reset_screen_drawing() {
+    scanline = 0;
+    dot_on_line = 0;
+    background_tile_line = [];
+    background_line_y = -8;
+    window_tile_line = [];
+    window_line_y = -8;
+    sprite_tile_line = [];
+    sprite_line_y = -8;
 };

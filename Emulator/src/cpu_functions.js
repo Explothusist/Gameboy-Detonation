@@ -246,7 +246,7 @@ function rr(val, fz, fn, fh, fc) {
     return val;
 }
 function DAA() {
-    alert("DAA");
+    // alert("DAA");
     //cpu_abort = true;
     if (!ram.Flag.N) {
         if (ram.Flag.C || ram.A > 0x99) {
@@ -4460,11 +4460,17 @@ function timing_handler(cyc_run) {
         console.log(cpu_timestamp.getTime());
         
         if (cyc_run === 0) {
+            // Safety in case we get off somehow
+            reset_screen_drawing();
+            // Overflow from last screen drawn now
+            draw_dots(cycles, XFF00, read);
             while (cycles < 70224) {
+                let old_cycles = cycles;
                 cpu_cycle();
 
                 spc_reg(cycles);
                 interrupt_handle();
+                draw_dots(cycles-old_cycles, XFF00, read);
                 if (dma === 1) {
                     cycles += 160;
                     dma = 0;
@@ -4558,7 +4564,7 @@ function timing_handler(cyc_run) {
             }
         }
 
-        draw(XFF00, read);
+        //draw(XFF00, read);
 
         cpu_timestamp = new Date();
         console.log(cpu_timestamp.getTime() + " : frame " + frames);
