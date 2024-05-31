@@ -464,6 +464,7 @@ function read(pos, message = 1) {
             );
         }
         alert(" !! ALERT !! Unusable memory read: " + pos.toString(16));
+        mem_abort = true;
         //return XFEA0[pos-0xFEA0];
     } else if (pos < 0xff4c) {
         //I/O Ports

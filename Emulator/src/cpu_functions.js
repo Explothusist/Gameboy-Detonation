@@ -2,6 +2,7 @@ let singledisp = document.getElementById("singledisp");
 let dump = document.getElementById("dump");
 let log_pos = document.getElementById("log_pos");
 let log_run = document.getElementById("log_run");
+let log_run_back = document.getElementById("log_run_back");
 
 let cpu_timestamp = new Date();
 
@@ -30,20 +31,17 @@ let old_ram = {A: 0, B: 0, C: 0, D: 0, E: 0, H: 0, L: 0, Flag: { Z: false, N: fa
 //             Opcodes to test: LD (nn),n, LD n,(nn), INC n, DEC n, (Rotates), JR (con),s, JP (con),nn, ADD nn,nn, ADD(C) n,n, SUB(C) n,n, AND n, XOR n,
 //                                                OR n, CP n, RET (con), CALL (con), LDH (n),A, LDH (C),A, ADD SP,s, LD (nn), A
 //             Opcodes tested:
-//Top line of some sprites missing
 //DAA opposes CPU Manual
 //Check EA and rombank changing (Pokemon 1F9B)
-//rombank causing sprite errors?
 //rebuild sound; createMeadiaStreamSource
 //8B is suspicious
 //go after ROM Bank set to zero in ZELDA; not much there
 //Check DAA out, called out as wrong
 //Look over interrupts, EI, DI
 //Something up in stack pointer test
-//Investigate all ADC and SBC
 //Investigate all non-CB shifts/rotates
-//1: fail, 2: fail, 3: (Inf RAM deac.), 4: fail, 5: pass, 6: pass
-//7: (Inf RAM deac) 8: (Inf title), 9: fail, 10: pass, 11: fail
+//1: pass, 2: fail, 3: (Inf RAM deac.), 4: pass, 5: pass, 6: pass
+//7: (Inf RAM deac) 8: (Inf title), 9: fail, 10: pass, 11: pass
 //
 //Complete: 0,1,2,3,4,5,6,7,8,9,A,B,C,D,E,F
 //Timing:     0,1,2,3,4,5,6,7,8,9,A,B,C,D,E,F
@@ -56,7 +54,145 @@ let pos = 0x100; //PC
 let cycles = 0;
 let sound_timer = 8183.59375;
 let frames = 0;
-let ram = {A: 0,B: 0,C: 0,D: 0, E: 0, H: 0, L: 0,Flag: { Z: false, N: false, H: false, C: false },SP: [0, 0]};
+
+//01-special:
+//  Passed
+
+//02-interrupts:
+//  EI
+//  Failed #2
+
+//03-op sp,hl:
+//  infinite RAM Bank Deactivated
+
+//04-op r, imm:
+//  Passed
+
+//05-op rp:
+//  Passed
+
+//06-ld r,r:
+//  Passed
+
+//07-jr,jp,call,ret,rst:
+//  NOP (jump into memory)
+
+//08-misc instrs:
+//  NOP (jump into memory)
+
+//09-op r,r:
+//  NOP (jump into memory)
+
+//10-bit ops:
+//  Passed
+
+//11-op a,(hl):
+//  Passed
+
+function combine_2b8(first, second) {
+    return second + (first << 8);
+};
+function split_b16(large) {
+    return [
+        (large & 0xff00) >> 8,
+        large & 0x00ff
+    ];
+};
+class Register_Storage {
+
+    constructor() {
+        this.A = 0;
+        this.B = 0;
+        this.C = 0;
+        this.D = 0;
+        this.E = 0;
+        this.H = 0;
+        this.L = 0;
+        this.Flag = {
+            Z: false,
+            N: false,
+            H: false,
+            C: false
+        };
+        this.SP = [0, 0];
+    }
+    getA() {
+        return this.A;
+    }
+    getB() {
+        return this.B;
+    }
+    getC() {
+        return this.C;
+    }
+    getD() {
+        return this.D;
+    }
+    getE() {
+        return this.E;
+    }
+    getH() {
+        return this.H;
+    }
+    getL() {
+        return this.L;
+    }
+    setA(value) {
+        this.A = value;
+    }
+    setB(value) {
+        this.B = value;
+    }
+    setC(value) {
+        this.C = value;
+    }
+    setD(value) {
+        this.D = value;
+    }
+    setE(value) {
+        this.E = value;
+    }
+    setH(value) {
+        this.H = value;
+    }
+    setL(value) {
+        this.L = value;
+    }
+    getBC() {
+        return combine_2b8(this.B, this.C);
+    }
+    getDE() {
+        return combine_2b8(this.D, this.E);
+    }
+    getHL() {
+        return combine_2b8(this.H, this.L);
+    }
+    setBC(value) {
+        let ret = split_b16(value);
+        this.setB(ret[0]);
+        this.setC(ret[1]);
+    }
+    setDE(value) {
+        let ret = split_b16(value);
+        this.setD(ret[0]);
+        this.setE(ret[1]);
+    }
+    setHL(value) {
+        let ret = split_b16(value);
+        this.setH(ret[0]);
+        this.setL(ret[1]);
+    }
+    getSP() {
+        return combine_2b8(this.SP[0], this.SP[1]);
+    }
+    setSP(value) {
+        let ret = split_b16(value);
+        this.SP[0] = ret[0];
+        this.SP[1] = ret[1];
+    }
+};
+
+let ram = new Register_Storage();
 
 dump.addEventListener("change", function () {
     alert(dump.checked);
@@ -69,6 +205,19 @@ dump.addEventListener("change", function () {
     }
 });
 
+// Universal Functions
+function get_byte(no_mem_log=false) {
+    let ret = 0;
+    if (no_mem_log) {
+        ret = read(pos, 0);
+    }else {
+        ret = read(pos);
+    }
+    pos++;
+    return ret;
+};
+
+// Operation Functions
 function alub8adder(num, val, fz, fn, fh, fc) {
     if (fh !== 0) {
         let fnum = Math.abs(num) & 0b0000_1111;
@@ -114,8 +263,8 @@ function alub8adder(num, val, fz, fn, fh, fc) {
     return num;
 }
 function alub16adder(n, v, fz, fn, fh, fc) {
-    let num = n[1] + n[0] * 0b1_0000_0000;
-    let val = v[1] + v[0] * 0b1_0000_0000;
+    let num = combine_2b8(n[0], n[1]);
+    let val = combine_2b8(v[0], v[1]);
     if (fh !== 0) {
         let fnum = Math.abs(num) & 0b1111_1111_1111;
         if (num < 0) {
@@ -152,7 +301,7 @@ function alub16adder(n, v, fz, fn, fh, fc) {
         num += 0b1_0000_0000_0000_0000;
     }
     num = num & 0b1111_1111_1111_1111;
-    let ret = [(num & 0b1111_1111_0000_0000) >> 8, num & 0b0000_0000_1111_1111];
+    let ret = split_b16(num);
     return ret;
 }
 function rlc(val, fz, fn, fh, fc) {
@@ -259,19 +408,13 @@ function DAA() {
     } else {
         if (ram.Flag.C) {
             ram.A -= 0x60;
+            ram.Flag.C = true;
         }
         if (ram.Flag.H) {
             ram.A -= 0x6;
         }
     }
-    /*if (!ram.Flag.N && ram.A > 0x99) {
-        ram.Flag.C = true;
-    }else if (!ram.Flag.N) {
-        ram.Flag.C = false;
-    }*/
-    if (ram.A > 0x99) {
-        ram.A -= 0x100;
-    }
+    ram.A = ram.A & 0xff;
     if (ram.A === 0) {
         ram.Flag.Z = true;
     }else {
@@ -280,30 +423,64 @@ function DAA() {
     ram.Flag.H = false;
 }
 function stackpushb16(val) {
-    let extract = ram.SP[1] + ram.SP[0] * 0b1_0000_0000;
-    extract--;
-    write(extract, val[1]);
+    let extract = ram.getSP();
     extract--;
     write(extract, val[0]);
-    ram.SP[1] = extract & 0b0000_0000_1111_1111;
-    ram.SP[0] = (extract & 0b1111_1111_0000_0000) >> 8;
+    extract--;
+    write(extract, val[1]);
+    ram.setSP(extract);
 }
 function stackpopb16() {
     let val = [0, 0];
-    let extract = ram.SP[1] + ram.SP[0] * 0b1_0000_0000;
-    val[0] = read(extract);
-    extract++;
+    let extract = ram.getSP();
     val[1] = read(extract);
     extract++;
-    ram.SP[1] = extract & 0b0000_0000_1111_1111;
-    ram.SP[0] = (extract & 0b1111_1111_0000_0000) >> 8;
+    val[0] = read(extract);
+    extract++;
+    ram.setSP(extract);
     return val;
 }
+function sbcA(to_sub) {
+    // Rewrote a subtraction routine to deal with integers and overflow
+    // instead of deal with X - (0xff + 1)
+    let subbed = 0;
+    let car = 0;
+    if (ram.Flag.C) {
+        car = 1;
+    }
+    subbed = ram.A - (to_sub + car);
+    if (subbed < 0) {
+        ram.Flag.C = true;
+        subbed += 256;
+    } else {
+        ram.Flag.C = false;
+    }
+    if (((ram.A & 0b00001111) - (to_sub & 0b00001111) - car) < 0) {
+        ram.Flag.H = true;
+    } else {
+        ram.Flag.H = false;
+    }
+    ram.A = subbed;
+    ram.Flag.N = true;
+    if (ram.A == 0) {
+        ram.Flag.Z = true;
+    } else {
+        ram.Flag.Z = false;
+    }
+}
 
+// Opcode Functions
+
+let nop_counter = 0;
 function run0x00() {
     //NOP
     //Do Nothing
-    pos++;
+    nop_counter += 2;
+    if (nop_counter >= 20) {
+        alert("Suspiciously many NOPs");
+        cpu_abort = true;
+    }
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x00    NOP");
@@ -311,11 +488,10 @@ function run0x00() {
 }
 function run0x01() {
     //LD BC, nn
-    pos++;
-    ram.C = read(pos);
-    pos++;
-    ram.B = read(pos);
-    pos++;
+    let n1 = get_byte();
+    let n2 = get_byte();
+    ram.setBC(combine_2b8(n2, n1));
+    
     cycles += 12;
     if (cpu_dump_intstr === 1) {
         console.log("0x01    LD BC, nn");
@@ -324,8 +500,8 @@ function run0x01() {
 }
 function run0x02() {
     //LD (BC), A
-    write(ram.C + ram.B * 0b1_0000_0000, ram.A);
-    pos++;
+    write(ram.getBC(), ram.getA());
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0x02    LD (BC), A");
@@ -334,10 +510,9 @@ function run0x02() {
 }
 function run0x03() {
     //INC BC
-    let ret = alub16adder([ram.B, ram.C], [0, 1], 0, 0, 0, 0);
-    ram.B = ret[0];
-    ram.C = ret[1];
-    pos++;
+    let ret = alub16adder([ram.getB(), ram.getC()], [0, 1], 0, 0, 0, 0);
+    ram.setBC(combine_2b8(ret[0], ret[1]));
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0x03 INC BC");
@@ -346,9 +521,9 @@ function run0x03() {
 }
 function run0x04() {
     //INC B
-    ram.B = alub8adder(ram.B, 1, 1, 0, 1, 0);
+    ram.setB(alub8adder(ram.getB(), 1, 1, 0, 1, 0));
     ram.Flag.N = false;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x04 INC B");
@@ -357,9 +532,9 @@ function run0x04() {
 }
 function run0x05() {
     //DEC B
-    ram.B = alub8adder(ram.B, -1, 1, 0, -1, 0);
+    ram.setB(alub8adder(ram.getB(), -1, 1, 0, -1, 0));
     ram.Flag.N = true;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x05 DEC B");
@@ -368,9 +543,8 @@ function run0x05() {
 }
 function run0x06() {
     //LD B, n
-    pos++;
-    ram.B = read(pos);
-    pos++;
+    ram.setB(get_byte());
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0x06 LD B, n");
@@ -379,10 +553,10 @@ function run0x06() {
 }
 function run0x07() {
     //RLCA
-    ram.A = rlc(ram.A, 1, 0, 0, 1);
+    ram.setA(rlc(ram.getA(), 1, 0, 0, 1));
     ram.Flag.N = false;
     ram.Flag.H = false;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x07 RLCA");
@@ -391,11 +565,10 @@ function run0x07() {
 }
 function run0x08() {
     //LD (nn), SP
-    pos++;
-    ram.SP[1] = read(pos);
-    pos++;
-    ram.SP[0] = read(pos);
-    pos++;
+    let n1 = get_byte();
+    let n2 = get_byte();
+    ram.setSP(combine_2b8(n2, n1));
+    
     cycles += 20;
     if (cpu_dump_intstr === 1) {
         console.log("0x08 LD (nn), SP");
@@ -404,11 +577,10 @@ function run0x08() {
 }
 function run0x09() {
     //ADD HL, BC
-    let ret = alub16adder([ram.H, ram.L], [ram.B, ram.C], 0, 0, 1, 1);
-    ram.H = ret[0];
-    ram.L = ret[1];
+    let ret = alub16adder([ram.getH(), ram.getL()], [ram.getB(), ram.getC()], 0, 0, 1, 1);
+    ram.setHL(combine_2b8(ret[0], ret[1]));
     ram.Flag.N = false;
-    pos++;
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0x09 ADD HL, BC");
@@ -417,8 +589,8 @@ function run0x09() {
 }
 function run0x0A() {
     //LD A, (BC)
-    ram.A = read(ram.C + ram.B * 0b1_0000_0000);
-    pos++;
+    ram.A = read(ram.getBC());
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0x0A LD A, (BC)");
@@ -428,9 +600,8 @@ function run0x0A() {
 function run0x0B() {
     //DEC BC
     let ret = alub16adder([ram.B, ram.C], [0, -1], 0, 0, 0, 0);
-    ram.B = ret[0];
-    ram.C = ret[1];
-    pos++;
+    ram.setBC(combine_2b8(ret[0], ret[1]));
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0x0B DEC BC");
@@ -441,7 +612,7 @@ function run0x0C() {
     //INC C
     ram.C = alub8adder(ram.C, 1, 1, 0, 1, 0);
     ram.Flag.N = false;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x0C INC C");
@@ -452,7 +623,7 @@ function run0x0D() {
     //DEC C
     ram.C = alub8adder(ram.C, -1, 1, 0, -1, 0);
     ram.Flag.N = true;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x0D DEC C");
@@ -461,9 +632,8 @@ function run0x0D() {
 }
 function run0x0E() {
     //LD C, n
-    pos++;
-    ram.C = read(pos);
-    pos++;
+    ram.C = get_byte();
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0x0E LD C, n");
@@ -475,7 +645,7 @@ function run0x0F() {
     ram.A = rrc(ram.A, 1, 0, 0, 1);
     ram.Flag.N = false;
     ram.Flag.H = false;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x0F RRCA");
@@ -485,8 +655,8 @@ function run0x0F() {
 function run0x10() {
     //STOP
     stopped = true;
-    pos++;
-    pos++;
+    get_byte();
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x10 STOP");
@@ -494,11 +664,10 @@ function run0x10() {
 }
 function run0x11() {
     //LD DE, nn
-    pos++;
-    ram.E = read(pos);
-    pos++;
-    ram.D = read(pos);
-    pos++;
+    let n1 = get_byte();
+    let n2 = get_byte();
+    ram.setDE(combine_2b8(n2, n1));
+    
     cycles += 12;
     if (cpu_dump_intstr === 1) {
         console.log("0x11    LD DE, nn");
@@ -507,8 +676,8 @@ function run0x11() {
 }
 function run0x12() {
     //LD (DE), A
-    write(ram.E + ram.D * 0b1_0000_0000, ram.A);
-    pos++;
+    write(ram.getDE(), ram.A);
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0x12    LD (DE), A");
@@ -520,9 +689,8 @@ function run0x12() {
 function run0x13() {
     //INC DE
     let ret = alub16adder([ram.D, ram.E], [0, 1], 0, 0, 0, 0);
-    ram.D = ret[0];
-    ram.E = ret[1];
-    pos++;
+    ram.setDE(combine_2b8(ret[0], ret[1]));
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0x13 INC DE");
@@ -533,7 +701,7 @@ function run0x14() {
     //INC D
     ram.D = alub8adder(ram.D, 1, 1, 0, 1, 0);
     ram.Flag.N = false;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x14 INC D");
@@ -544,7 +712,7 @@ function run0x15() {
     //DEC D
     ram.D = alub8adder(ram.D, -1, 1, 0, -1, 0);
     ram.Flag.N = true;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x15 DEC D");
@@ -553,9 +721,8 @@ function run0x15() {
 }
 function run0x16() {
     //LD D, n
-    pos++;
-    ram.D = read(pos);
-    pos++;
+    ram.D = get_byte();
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0x16 LD D, n");
@@ -567,7 +734,7 @@ function run0x17() {
     ram.A = rl(ram.A, 1, 0, 0, 1);
     ram.Flag.N = false;
     ram.Flag.H = false;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x17 RLA");
@@ -576,9 +743,7 @@ function run0x17() {
 }
 function run0x18() {
     //JR n
-    pos++;
-    let signed = read(pos);
-    pos++;
+    let signed = get_byte();
     if (signed >= 0b1000_0000) {
         signed = -(~(signed - 1) & 0b1111_1111);
     }
@@ -593,10 +758,9 @@ function run0x18() {
 function run0x19() {
     //ADD HL, DE
     let ret = alub16adder([ram.H, ram.L], [ram.D, ram.E], 0, 0, 1, 1);
-    ram.H = ret[0];
-    ram.L = ret[1];
+    ram.setHL(combine_2b8(ret[0], ret[1]));
     ram.Flag.N = false;
-    pos++;
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0x19 ADD HL, DE");
@@ -605,8 +769,8 @@ function run0x19() {
 }
 function run0x1A() {
     //LD A, (DE)
-    ram.A = read(ram.E + ram.D * 0b1_0000_0000);
-    pos++;
+    ram.A = read(ram.getDE());
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0x1A LD A, (DE)");
@@ -616,9 +780,8 @@ function run0x1A() {
 function run0x1B() {
     //DEC DE
     let ret = alub16adder([ram.D, ram.E], [0, -1], 0, 0, 0, 0);
-    ram.D = ret[0];
-    ram.E = ret[1];
-    pos++;
+    ram.setDE(combine_2b8(ret[0], ret[1]));
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0x1B DEC DE");
@@ -629,7 +792,7 @@ function run0x1C() {
     //INC E
     ram.E = alub8adder(ram.E, 1, 1, 0, 1, 0);
     ram.Flag.N = false;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x1C INC E");
@@ -640,7 +803,7 @@ function run0x1D() {
     //DEC E
     ram.E = alub8adder(ram.E, -1, 1, 0, -1, 0);
     ram.Flag.N = true;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x1D DEC E");
@@ -649,9 +812,8 @@ function run0x1D() {
 }
 function run0x1E() {
     //LD E, n
-    pos++;
-    ram.E = read(pos);
-    pos++;
+    ram.E = get_byte();
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0x1E LD E, n");
@@ -663,7 +825,7 @@ function run0x1F() {
     ram.A = rr(ram.A, 1, 0, 0, 1);
     ram.Flag.N = false;
     ram.Flag.H = false;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x0F RRA");
@@ -672,9 +834,8 @@ function run0x1F() {
 }
 function run0x20() {
     //JR NZ, n
-    pos++;
-    let signed = read(pos);
-    pos++;
+    let signed = get_byte();
+    
     if (signed >= 0b1000_0000) {
         signed = -(~(signed - 1) & 0b1111_1111);
     }
@@ -692,11 +853,10 @@ function run0x20() {
 }
 function run0x21() {
     //LD HL, nn
-    pos++;
-    ram.L = read(pos);
-    pos++;
-    ram.H = read(pos);
-    pos++;
+    let n1 = get_byte();
+    let n2 = get_byte();
+    ram.setHL(combine_2b8(n2, n1));
+    
     cycles += 12;
     if (cpu_dump_intstr === 1) {
         console.log("0x21    LD HL, nn");
@@ -705,11 +865,10 @@ function run0x21() {
 }
 function run0x22() {
     //LDI (HL), A
-    write(ram.L + ram.H * 0b1_0000_0000, ram.A);
+    write(ram.getHL(), ram.A);
     let ret = alub16adder([ram.H, ram.L], [0, 1], 0, 0, 0, 0);
-    ram.H = ret[0];
-    ram.L = ret[1];
-    pos++;
+    ram.setHL(combine_2b8(ret[0], ret[1]));
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0x22    LDI (HL), A");
@@ -720,9 +879,8 @@ function run0x22() {
 function run0x23() {
     //INC HL
     let ret = alub16adder([ram.H, ram.L], [0, 1], 0, 0, 0, 0);
-    ram.H = ret[0];
-    ram.L = ret[1];
-    pos++;
+    ram.setHL(combine_2b8(ret[0], ret[1]));
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0x23 INC HL");
@@ -733,7 +891,7 @@ function run0x24() {
     //INC H
     ram.H = alub8adder(ram.H, 1, 1, 0, 1, 0);
     ram.Flag.N = false;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x24 INC H");
@@ -744,7 +902,7 @@ function run0x25() {
     //DEC H
     ram.H = alub8adder(ram.H, -1, 1, 0, -1, 0);
     ram.Flag.N = true;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x25 DEC H");
@@ -753,9 +911,8 @@ function run0x25() {
 }
 function run0x26() {
     //LD H, n
-    pos++;
-    ram.H = read(pos);
-    pos++;
+    ram.H = get_byte();
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0x26 LD H, n");
@@ -765,7 +922,7 @@ function run0x26() {
 function run0x27() {
     //DAA
     DAA();
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x27 DAA");
@@ -774,9 +931,7 @@ function run0x27() {
 }
 function run0x28() {
     //JR Z, n
-    pos++;
-    let signed = read(pos);
-    pos++;
+    let signed = get_byte();
     if (signed >= 0b1000_0000) {
         signed = -(~(signed - 1) & 0b1111_1111);
     }
@@ -786,7 +941,7 @@ function run0x28() {
     } else {
         cycles += 8;
     }
-    //pos++;
+
     if (cpu_dump_intstr === 1) {
         console.log("0x28 JR Z, n");
         console.log("n:" + signed.toString(16));
@@ -796,10 +951,9 @@ function run0x28() {
 function run0x29() {
     //ADD HL, HL
     let ret = alub16adder([ram.H, ram.L], [ram.H, ram.L], 0, 0, 1, 1);
-    ram.H = ret[0];
-    ram.L = ret[1];
+    ram.setHL(combine_2b8(ret[0], ret[1]));
     ram.Flag.N = false;
-    pos++;
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0x29 ADD HL, HL");
@@ -808,11 +962,10 @@ function run0x29() {
 }
 function run0x2A() {
     //LDI A, (HL)
-    ram.A = read(ram.L + ram.H * 0b1_0000_0000);
+    ram.A = read(ram.getHL());
     let ret = alub16adder([ram.H, ram.L], [0, 1], 0, 0, 0, 0);
-    ram.H = ret[0];
-    ram.L = ret[1];
-    pos++;
+    ram.setHL(combine_2b8(ret[0], ret[1]));
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0x2A LDI A, (HL)");
@@ -823,9 +976,8 @@ function run0x2A() {
 function run0x2B() {
     //DEC HL
     let ret = alub16adder([ram.H, ram.L], [0, -1], 0, 0, 0, 0);
-    ram.H = ret[0];
-    ram.L = ret[1];
-    pos++;
+    ram.setHL(combine_2b8(ret[0], ret[1]));
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0x2B DEC HL");
@@ -836,7 +988,7 @@ function run0x2C() {
     //INC L
     ram.L = alub8adder(ram.L, 1, 1, 0, 1, 0);
     ram.Flag.N = false;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x2C INC L");
@@ -847,7 +999,7 @@ function run0x2D() {
     //DEC L
     ram.L = alub8adder(ram.L, -1, 1, 0, -1, 0);
     ram.Flag.N = true;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x2D DEC L");
@@ -856,9 +1008,8 @@ function run0x2D() {
 }
 function run0x2E() {
     //LD L, n
-    pos++;
-    ram.L = read(pos);
-    pos++;
+    ram.L = get_byte();
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0x2E LD L, n");
@@ -871,7 +1022,7 @@ function run0x2F() {
     ram.Flag.N = true;
     ram.Flag.H = true;
     ram.A &= 0b1111_1111;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x2F CPL");
@@ -880,9 +1031,7 @@ function run0x2F() {
 }
 function run0x30() {
     //JR NC, n
-    pos++;
-    let signed = read(pos);
-    pos++;
+    let signed = get_byte();
     if (signed >= 0b1000_0000) {
         signed = -(~(signed - 1) & 0b1111_1111);
     }
@@ -892,7 +1041,7 @@ function run0x30() {
     } else {
         cycles += 8;
     }
-    //pos++;
+    
     if (cpu_dump_intstr === 1) {
         console.log("0x30 JR NC, n");
         console.log("n:" + signed.toString(16));
@@ -901,11 +1050,10 @@ function run0x30() {
 }
 function run0x31() {
     //LD SP, nn
-    pos++;
-    ram.SP[1] = read(pos);
-    pos++;
-    ram.SP[0] = read(pos);
-    pos++;
+    let n1 = get_byte();
+    let n2 = get_byte();
+    ram.setSP(combine_2b8(n2, n1));
+    
     cycles += 12;
     if (cpu_dump_intstr === 1) {
         console.log("0x31    LD SP, nn");
@@ -914,11 +1062,10 @@ function run0x31() {
 }
 function run0x32() {
     //LDD (HL), A
-    write(ram.L + ram.H * 0b1_0000_0000, ram.A);
+    write(ram.getHL(), ram.A);
     let ret = alub16adder([ram.H, ram.L], [0, -1], 0, 0, 0, 0);
-    ram.H = ret[0];
-    ram.L = ret[1];
-    pos++;
+    ram.setHL(combine_2b8(ret[0], ret[1]));
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0x32    LDD (HL), A");
@@ -929,7 +1076,7 @@ function run0x32() {
 function run0x33() {
     //INC SP
     ram.SP = alub16adder(ram.SP, [0, 1], 0, 0, 0, 0);
-    pos++;
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0x33 INC SP");
@@ -938,10 +1085,10 @@ function run0x33() {
 }
 function run0x34() {
     //INC (HL)
-    let adr = ram.L + ram.H * 0b1_0000_0000;
+    let adr = ram.getHL();
     write(adr, alub8adder(read(adr), 1, 1, 0, 1, 0));
     ram.Flag.N = false;
-    pos++;
+    
     cycles += 12;
     if (cpu_dump_intstr === 1) {
         console.log("0x34 INC (HL)");
@@ -950,10 +1097,10 @@ function run0x34() {
 }
 function run0x35() {
     //DEC (HL)
-    let adr = ram.L + ram.H * 0b1_0000_0000;
+    let adr = ram.getHL();
     write(adr, alub8adder(read(adr), -1, 1, 0, -1, 0));
     ram.Flag.N = true;
-    pos++;
+    
     cycles += 12;
     if (cpu_dump_intstr === 1) {
         console.log("0x35 DEC (HL)");
@@ -962,9 +1109,8 @@ function run0x35() {
 }
 function run0x36() {
     //LD (HL), n
-    pos++;
-    write(ram.L + ram.H * 0b1_0000_0000, read(pos));
-    pos++;
+    write(ram.getHL(), get_byte());
+    
     cycles += 12;
     if (cpu_dump_intstr === 1) {
         console.log("0x36 LD (HL), n");
@@ -978,7 +1124,7 @@ function run0x37() {
     ram.Flag.N = false;
     ram.Flag.H = false;
     ram.Flag.C = true;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x37 SCF");
@@ -986,9 +1132,7 @@ function run0x37() {
 }
 function run0x38() {
     //JR C, n
-    pos++;
-    let signed = read(pos);
-    pos++;
+    let signed = get_byte();
     if (signed >= 0b1000_0000) {
         signed = -(~(signed - 1) & 0b1111_1111);
     }
@@ -998,7 +1142,7 @@ function run0x38() {
     } else {
         cycles += 8;
     }
-    //pos++;
+    
     if (cpu_dump_intstr === 1) {
         console.log("0x38 JR C, n");
         console.log("n:" + signed.toString(16));
@@ -1008,10 +1152,9 @@ function run0x38() {
 function run0x39() {
     //ADD HL, SP
     let ret = alub16adder([ram.H, ram.L], ram.SP, 0, 0, 1, 1);
-    ram.H = ret[0];
-    ram.L = ret[1];
+    ram.setHL(combine_2b8(ret[0], ret[1]));
     ram.Flag.N = false;
-    pos++;
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0x39 ADD HL, SP");
@@ -1020,11 +1163,10 @@ function run0x39() {
 }
 function run0x3A() {
     //LDD A, (HL)
-    ram.A = read(ram.L + ram.H * 0b1_0000_0000);
+    ram.A = read(ram.getHL());
     let ret = alub16adder([ram.H, ram.L], [0, -1], 0, 0, 0, 0);
-    ram.H = ret[0];
-    ram.L = ret[1];
-    pos++;
+    ram.setHL(combine_2b8(ret[0], ret[1]));
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0x3A LDD A, (HL)");
@@ -1035,7 +1177,7 @@ function run0x3A() {
 function run0x3B() {
     //DEC SP
     ram.SP = alub16adder(ram.SP, [0, -1], 0, 0, 0, 0);
-    pos++;
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0x3B DEC SP");
@@ -1046,7 +1188,7 @@ function run0x3C() {
     //INC A
     ram.A = alub8adder(ram.A, 1, 1, 0, 1, 0);
     ram.Flag.N = false;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x3C INC A");
@@ -1057,7 +1199,7 @@ function run0x3D() {
     //DEC A
     ram.A = alub8adder(ram.A, -1, 1, 0, -1, 0);
     ram.Flag.N = true;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x3D DEC A");
@@ -1066,9 +1208,8 @@ function run0x3D() {
 }
 function run0x3E() {
     //LD A, n
-    pos++;
-    ram.A = read(pos);
-    pos++;
+    ram.A = get_byte();
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0x3E LD A, n");
@@ -1080,7 +1221,7 @@ function run0x3F() {
     ram.Flag.N = false;
     ram.Flag.H = false;
     ram.Flag.C = !ram.Flag.C;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x37 SCF");
@@ -1089,7 +1230,7 @@ function run0x3F() {
 function run0x40() {
     //LD B, B
     //Why does this exist?
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x40 LD B, B");
@@ -1099,7 +1240,7 @@ function run0x40() {
 function run0x41() {
     //LD B, C
     ram.B = ram.C;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x41 LD B, C");
@@ -1109,7 +1250,7 @@ function run0x41() {
 function run0x42() {
     //LD B, D
     ram.B = ram.D;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x42 LD B, D");
@@ -1119,7 +1260,7 @@ function run0x42() {
 function run0x43() {
     //LD B, E
     ram.B = ram.E;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x43 LD B, E");
@@ -1129,7 +1270,7 @@ function run0x43() {
 function run0x44() {
     //LD B, H
     ram.B = ram.H;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x44 LD B, H");
@@ -1139,7 +1280,7 @@ function run0x44() {
 function run0x45() {
     //LD B, L
     ram.B = ram.L;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x45 LD B, L");
@@ -1148,8 +1289,8 @@ function run0x45() {
 }
 function run0x46() {
     //LD B, (HL)
-    ram.B = read(ram.L + ram.H * 0b1_0000_0000);
-    pos++;
+    ram.B = read(ram.getHL());
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0x46 LD B, (HL)");
@@ -1159,7 +1300,7 @@ function run0x46() {
 function run0x47() {
     //LD B, A
     ram.B = ram.A;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x47 LD B, A");
@@ -1169,7 +1310,7 @@ function run0x47() {
 function run0x48() {
     //LD C, B
     ram.C = ram.B;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x48 LD C, B");
@@ -1178,7 +1319,7 @@ function run0x48() {
 }
 function run0x49() {
     //LD C, C
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x49 LD C, C");
@@ -1188,7 +1329,7 @@ function run0x49() {
 function run0x4A() {
     //LD C, D
     ram.C = ram.D;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x4A LD C, D");
@@ -1198,7 +1339,7 @@ function run0x4A() {
 function run0x4B() {
     //LD C, E
     ram.C = ram.E;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x4B LD C, E");
@@ -1208,7 +1349,7 @@ function run0x4B() {
 function run0x4C() {
     //LD C, H
     ram.C = ram.H;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x4C LD C, H");
@@ -1218,7 +1359,7 @@ function run0x4C() {
 function run0x4D() {
     //LD C, L
     ram.C = ram.L;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x4D LD C, L");
@@ -1227,8 +1368,8 @@ function run0x4D() {
 }
 function run0x4E() {
     //LD C, (HL)
-    ram.C = read(ram.L + ram.H * 0b1_0000_0000);
-    pos++;
+    ram.C = read(ram.getHL());
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0x4E LD C, (HL)");
@@ -1239,7 +1380,7 @@ function run0x4F() {
     //LD C, A
     ram.C = ram.A;
     cycles += 4;
-    pos++;
+    
     if (cpu_dump_intstr === 1) {
         console.log("0x4F LD C, A");
         console.log("C:" + ram.C.toString(16));
@@ -1249,7 +1390,7 @@ function run0x50() {
     //LD D, B
     ram.D = ram.B;
     cycles += 4;
-    pos++;
+    
     if (cpu_dump_intstr === 1) {
         console.log("0x50 LD D, B");
         console.log("D:" + ram.D.toString(16));
@@ -1259,7 +1400,7 @@ function run0x51() {
     //LD D, C
     ram.D = ram.C;
     cycles += 4;
-    pos++;
+    
     if (cpu_dump_intstr === 1) {
         console.log("0x51 LD D, C");
         console.log("D:" + ram.D.toString(16));
@@ -1268,7 +1409,7 @@ function run0x51() {
 function run0x52() {
     //LD D, D
     //Why?
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x52 LD D, D");
@@ -1278,7 +1419,7 @@ function run0x52() {
 function run0x53() {
     //LD D, E
     ram.D = ram.E;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x53 LD D, E");
@@ -1288,7 +1429,7 @@ function run0x53() {
 function run0x54() {
     //LD D, H
     ram.D = ram.H;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x54 LD D, H");
@@ -1298,7 +1439,7 @@ function run0x54() {
 function run0x55() {
     //LD D, L
     ram.D = ram.L;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x55 LD D, L");
@@ -1307,8 +1448,8 @@ function run0x55() {
 }
 function run0x56() {
     //LD D, (HL)
-    ram.D = read(ram.L + ram.H * 0b1_0000_0000);
-    pos++;
+    ram.D = read(ram.getHL());
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0x56 LD D, (HL)");
@@ -1318,7 +1459,7 @@ function run0x56() {
 function run0x57() {
     //LD D, A
     ram.D = ram.A;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x57 LD D, A");
@@ -1328,7 +1469,7 @@ function run0x57() {
 function run0x58() {
     //LD E, B
     ram.E = ram.B;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x58 LD E, B");
@@ -1338,7 +1479,7 @@ function run0x58() {
 function run0x59() {
     //LD E, C
     ram.E = ram.C;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x59 LD E, C");
@@ -1348,7 +1489,7 @@ function run0x59() {
 function run0x5A() {
     //LD E, D
     ram.E = ram.D;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x5A LD E, D");
@@ -1358,7 +1499,7 @@ function run0x5A() {
 function run0x5B() {
     //LD E, E
     //Why?
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x5B LD E, E");
@@ -1368,7 +1509,7 @@ function run0x5B() {
 function run0x5C() {
     //LD E, H
     ram.E = ram.H;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x5C LD E, H");
@@ -1378,7 +1519,7 @@ function run0x5C() {
 function run0x5D() {
     //LD E, L
     ram.E = ram.L;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x5D LD E, L");
@@ -1387,8 +1528,8 @@ function run0x5D() {
 }
 function run0x5E() {
     //LD E, (HL)
-    ram.E = read(ram.L + ram.H * 0b1_0000_0000);
-    pos++;
+    ram.E = read(ram.getHL());
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x5E LD E, (HL)");
@@ -1398,7 +1539,7 @@ function run0x5E() {
 function run0x5F() {
     //LD E, A
     ram.E = ram.A;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x5F LD E, A");
@@ -1408,7 +1549,7 @@ function run0x5F() {
 function run0x60() {
     //LD H, B
     ram.H = ram.B;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x60 LD H, B");
@@ -1418,7 +1559,7 @@ function run0x60() {
 function run0x61() {
     //LD H, C
     ram.H = ram.C;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x61 LD H, C");
@@ -1428,7 +1569,7 @@ function run0x61() {
 function run0x62() {
     //LD H, D
     ram.H = ram.D;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x62 LD H, D");
@@ -1438,7 +1579,7 @@ function run0x62() {
 function run0x63() {
     //LD H, E
     ram.H = ram.E;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x63 LD H, E");
@@ -1448,7 +1589,7 @@ function run0x63() {
 function run0x64() {
     //LD H, H
     //Why?
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x64 LD H, H");
@@ -1458,7 +1599,7 @@ function run0x64() {
 function run0x65() {
     //LD H, L
     ram.H = ram.L;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x65 LD H, L");
@@ -1467,8 +1608,8 @@ function run0x65() {
 }
 function run0x66() {
     //LD H, (HL)
-    ram.H = read(ram.L + ram.H * 0b1_0000_0000);
-    pos++;
+    ram.H = read(ram.getHL());
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0x66 LD H, (HL)");
@@ -1478,7 +1619,7 @@ function run0x66() {
 function run0x67() {
     //LD H, A
     ram.H = ram.A;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x67 LD H, A");
@@ -1488,7 +1629,7 @@ function run0x67() {
 function run0x68() {
     //LD L, B
     ram.L = ram.B;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x68 LD L, B");
@@ -1498,7 +1639,7 @@ function run0x68() {
 function run0x69() {
     //LD L, C
     ram.L = ram.C;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x69 LD L, C");
@@ -1508,7 +1649,7 @@ function run0x69() {
 function run0x6A() {
     //LD L, D
     ram.L = ram.D;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x6A LD L, D");
@@ -1518,7 +1659,7 @@ function run0x6A() {
 function run0x6B() {
     //LD L, E
     ram.L = ram.E;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x6B LD L, E");
@@ -1528,7 +1669,7 @@ function run0x6B() {
 function run0x6C() {
     //LD L, H
     ram.L = ram.H;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x6C LD L, H");
@@ -1538,7 +1679,7 @@ function run0x6C() {
 function run0x6D() {
     //LD L, L
     //Why?
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x6D LD L, L");
@@ -1547,8 +1688,8 @@ function run0x6D() {
 }
 function run0x6E() {
     //LD L, (HL)
-    ram.L = read(ram.L + ram.H * 0b1_0000_0000);
-    pos++;
+    ram.L = read(ram.getHL());
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0x6E LD L, (HL)");
@@ -1558,7 +1699,7 @@ function run0x6E() {
 function run0x6F() {
     //LD L, A
     ram.L = ram.A;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x6F LD L, A");
@@ -1567,8 +1708,8 @@ function run0x6F() {
 }
 function run0x70() {
     //LD (HL), B
-    write(ram.L + ram.H * 0b1_0000_0000, ram.B);
-    pos++;
+    write(ram.getHL(), ram.B);
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0x70    LD (HL), B");
@@ -1577,8 +1718,8 @@ function run0x70() {
 }
 function run0x71() {
     //LD (HL), C
-    write(ram.L + ram.H * 0b1_0000_0000, ram.C);
-    pos++;
+    write(ram.getHL(), ram.C);
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0x71    LD (HL), C");
@@ -1587,8 +1728,8 @@ function run0x71() {
 }
 function run0x72() {
     //LD (HL), D
-    write(ram.L + ram.H * 0b1_0000_0000, ram.D);
-    pos++;
+    write(ram.getHL(), ram.D);
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0x72    LD (HL), D");
@@ -1597,8 +1738,8 @@ function run0x72() {
 }
 function run0x73() {
     //LD (HL), E
-    write(ram.L + ram.H * 0b1_0000_0000, ram.E);
-    pos++;
+    write(ram.getHL(), ram.E);
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0x73    LD (HL), E");
@@ -1607,8 +1748,8 @@ function run0x73() {
 }
 function run0x74() {
     //LD (HL), H
-    write(ram.L + ram.H * 0b1_0000_0000, ram.H);
-    pos++;
+    write(ram.getHL(), ram.H);
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0x74    LD (HL), H");
@@ -1617,8 +1758,8 @@ function run0x74() {
 }
 function run0x75() {
     //LD (HL), L
-    write(ram.L + ram.H * 0b1_0000_0000, ram.L);
-    pos++;
+    write(ram.getHL(), ram.L);
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0x75    LD (HL), L");
@@ -1628,7 +1769,7 @@ function run0x75() {
 function run0x76() {
     //HALT
     halt = true;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x76    HALT");
@@ -1636,8 +1777,8 @@ function run0x76() {
 }
 function run0x77() {
     //LD (HL), A
-    write(ram.L + ram.H * 0b1_0000_0000, ram.A);
-    pos++;
+    write(ram.getHL(), ram.A);
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0x77    LD (HL), A");
@@ -1647,7 +1788,7 @@ function run0x77() {
 function run0x78() {
     //LD A, B
     ram.A = ram.B;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x78 LD A, B");
@@ -1657,7 +1798,7 @@ function run0x78() {
 function run0x79() {
     //LD A, C
     ram.A = ram.C;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x79 LD A, C");
@@ -1667,7 +1808,7 @@ function run0x79() {
 function run0x7A() {
     //LD A, D
     ram.A = ram.D;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x7A LD A, D");
@@ -1677,7 +1818,7 @@ function run0x7A() {
 function run0x7B() {
     //LD A, E
     ram.A = ram.E;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x7B LD A, E");
@@ -1687,7 +1828,7 @@ function run0x7B() {
 function run0x7C() {
     //LD A, H
     ram.A = ram.H;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x7C LD A, H");
@@ -1697,7 +1838,7 @@ function run0x7C() {
 function run0x7D() {
     //LD A, L
     ram.A = ram.L;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x7D LD A, L");
@@ -1706,8 +1847,8 @@ function run0x7D() {
 }
 function run0x7E() {
     //LD A, (HL)
-    ram.A = read(ram.L + ram.H * 0b1_0000_0000);
-    pos++;
+    ram.A = read(ram.getHL());
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0x7E LD A, (HL)");
@@ -1717,7 +1858,7 @@ function run0x7E() {
 function run0x7F() {
     //LD A, A
     //Why does this exist?
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x7F LD A, A");
@@ -1728,7 +1869,7 @@ function run0x80() {
     //ADD A, B
     ram.A = alub8adder(ram.A, ram.B, 1, 0, 1, 1);
     ram.Flag.N = false;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x80 ADD A, B");
@@ -1739,7 +1880,7 @@ function run0x81() {
     //ADD A, C
     ram.A = alub8adder(ram.A, ram.C, 1, 0, 1, 1);
     ram.Flag.N = false;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x81 ADD A, C");
@@ -1750,7 +1891,7 @@ function run0x82() {
     //ADD A, D
     ram.A = alub8adder(ram.A, ram.D, 1, 0, 1, 1);
     ram.Flag.N = false;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x82 ADD A, D");
@@ -1761,7 +1902,7 @@ function run0x83() {
     //ADD A, E
     ram.A = alub8adder(ram.A, ram.E, 1, 0, 1, 1);
     ram.Flag.N = false;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x83 ADD A, E");
@@ -1772,7 +1913,7 @@ function run0x84() {
     //ADD A, H
     ram.A = alub8adder(ram.A, ram.H, 1, 0, 1, 1);
     ram.Flag.N = false;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x84 ADD A, H");
@@ -1783,7 +1924,7 @@ function run0x85() {
     //ADD A, L
     ram.A = alub8adder(ram.A, ram.L, 1, 0, 1, 1);
     ram.Flag.N = false;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x85 ADD A, L");
@@ -1792,9 +1933,9 @@ function run0x85() {
 }
 function run0x86() {
     //ADD A, (HL)
-    ram.A = alub8adder( ram.A, read(ram.L + ram.H * 0b1_0000_0000), 1, 0, 1, 1 );
+    ram.A = alub8adder( ram.A, read(ram.getHL()), 1, 0, 1, 1 );
     ram.Flag.N = false;
-    pos++;
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0x86 ADD A, (HL)");
@@ -1805,7 +1946,7 @@ function run0x87() {
     //ADD A, A
     ram.A = alub8adder(ram.A, ram.A, 1, 0, 1, 1);
     ram.Flag.N = false;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x87 ADD A, A");
@@ -1818,9 +1959,24 @@ function run0x88() {
     if (ram.Flag.C) {
         car = 1;
     }
-    ram.A = alub8adder(ram.A, ram.B + car, 1, 0, 1, 1);
+    let keepH = false;
+    let keepC = false;
+    let to_add = alub8adder(ram.B, car, 1, 0, 1, 1);
+    if (ram.Flag.H) {
+        keepH = true;
+    }
+    if (ram.Flag.C) {
+        keepC = true;
+    }
+    ram.A = alub8adder(ram.A, to_add, 1, 0, 1, 1);
+    if (keepH) {
+        ram.Flag.H = true;
+    }
+    if (keepC) {
+        ram.Flag.C = true;
+    }
     ram.Flag.N = false;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x88 ADC A, B");
@@ -1833,9 +1989,24 @@ function run0x89() {
     if (ram.Flag.C) {
         car = 1;
     }
-    ram.A = alub8adder(ram.A, ram.C + car, 1, 0, 1, 1);
+    let keepH = false;
+    let keepC = false;
+    let to_add = alub8adder(ram.C, car, 1, 0, 1, 1);
+    if (ram.Flag.H) {
+        keepH = true;
+    }
+    if (ram.Flag.C) {
+        keepC = true;
+    }
+    ram.A = alub8adder(ram.A, to_add, 1, 0, 1, 1);
+    if (keepH) {
+        ram.Flag.H = true;
+    }
+    if (keepC) {
+        ram.Flag.C = true;
+    }
     ram.Flag.N = false;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x89 ADC A, C");
@@ -1848,9 +2019,24 @@ function run0x8A() {
     if (ram.Flag.C) {
         car = 1;
     }
-    ram.A = alub8adder(ram.A, ram.D + car, 1, 0, 1, 1);
+    let keepH = false;
+    let keepC = false;
+    let to_add = alub8adder(ram.D, car, 1, 0, 1, 1);
+    if (ram.Flag.H) {
+        keepH = true;
+    }
+    if (ram.Flag.C) {
+        keepC = true;
+    }
+    ram.A = alub8adder(ram.A, to_add, 1, 0, 1, 1);
+    if (keepH) {
+        ram.Flag.H = true;
+    }
+    if (keepC) {
+        ram.Flag.C = true;
+    }
     ram.Flag.N = false;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x8A ADC A, D");
@@ -1863,9 +2049,24 @@ function run0x8B() {
     if (ram.Flag.C) {
         car = 1;
     }
-    ram.A = alub8adder(ram.A, ram.E + car, 1, 0, 1, 1);
+    let keepH = false;
+    let keepC = false;
+    let to_add = alub8adder(ram.E, car, 1, 0, 1, 1);
+    if (ram.Flag.H) {
+        keepH = true;
+    }
+    if (ram.Flag.C) {
+        keepC = true;
+    }
+    ram.A = alub8adder(ram.A, to_add, 1, 0, 1, 1);
+    if (keepH) {
+        ram.Flag.H = true;
+    }
+    if (keepC) {
+        ram.Flag.C = true;
+    }
     ram.Flag.N = false;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x8B ADC A, E");
@@ -1878,9 +2079,24 @@ function run0x8C() {
     if (ram.Flag.C) {
         car = 1;
     }
-    ram.A = alub8adder(ram.A, ram.H + car, 1, 0, 1, 1);
+    let keepH = false;
+    let keepC = false;
+    let to_add = alub8adder(ram.H, car, 1, 0, 1, 1);
+    if (ram.Flag.H) {
+        keepH = true;
+    }
+    if (ram.Flag.C) {
+        keepC = true;
+    }
+    ram.A = alub8adder(ram.A, to_add, 1, 0, 1, 1);
+    if (keepH) {
+        ram.Flag.H = true;
+    }
+    if (keepC) {
+        ram.Flag.C = true;
+    }
     ram.Flag.N = false;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x8C ADC A, H");
@@ -1893,9 +2109,24 @@ function run0x8D() {
     if (ram.Flag.C) {
         car = 1;
     }
-    ram.A = alub8adder(ram.A, ram.L + car, 1, 0, 1, 1);
+    let keepH = false;
+    let keepC = false;
+    let to_add = alub8adder(ram.L, car, 1, 0, 1, 1);
+    if (ram.Flag.H) {
+        keepH = true;
+    }
+    if (ram.Flag.C) {
+        keepC = true;
+    }
+    ram.A = alub8adder(ram.A, to_add, 1, 0, 1, 1);
+    if (keepH) {
+        ram.Flag.H = true;
+    }
+    if (keepC) {
+        ram.Flag.C = true;
+    }
     ram.Flag.N = false;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x8D ADC A, L");
@@ -1908,9 +2139,24 @@ function run0x8E() {
     if (ram.Flag.C) {
         car = 1;
     }
-    ram.A = alub8adder( ram.A, read(ram.L + ram.H * 0b1_0000_0000) + car, 1, 0, 1, 1 );
+    let keepH = false;
+    let keepC = false;
+    let to_add = alub8adder(read(ram.getHL()), car, 1, 0, 1, 1);
+    if (ram.Flag.H) {
+        keepH = true;
+    }
+    if (ram.Flag.C) {
+        keepC = true;
+    }
+    ram.A = alub8adder(ram.A, to_add, 1, 0, 1, 1);
+    if (keepH) {
+        ram.Flag.H = true;
+    }
+    if (keepC) {
+        ram.Flag.C = true;
+    }
     ram.Flag.N = false;
-    pos++;
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0x8E ADC A, (HL)");
@@ -1923,9 +2169,24 @@ function run0x8F() {
     if (ram.Flag.C) {
         car = 1;
     }
-    ram.A = alub8adder(ram.A, ram.A + car, 1, 0, 1, 1);
+    let keepH = false;
+    let keepC = false;
+    let to_add = alub8adder(ram.A, car, 1, 0, 1, 1);
+    if (ram.Flag.H) {
+        keepH = true;
+    }
+    if (ram.Flag.C) {
+        keepC = true;
+    }
+    ram.A = alub8adder(ram.A, to_add, 1, 0, 1, 1);
+    if (keepH) {
+        ram.Flag.H = true;
+    }
+    if (keepC) {
+        ram.Flag.C = true;
+    }
     ram.Flag.N = false;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x8F ADC A, A");
@@ -1936,7 +2197,7 @@ function run0x90() {
     //SUB A, B
     ram.A = alub8adder(ram.A, -ram.B, 1, 0, -1, -1);
     ram.Flag.N = true;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x90 SUB A, B");
@@ -1947,7 +2208,7 @@ function run0x91() {
     //SUB A, C
     ram.A = alub8adder(ram.A, -ram.C, 1, 0, -1, -1);
     ram.Flag.N = true;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x91 SUB A, C");
@@ -1958,7 +2219,7 @@ function run0x92() {
     //SUB A, D
     ram.A = alub8adder(ram.A, -ram.D, 1, 0, -1, -1);
     ram.Flag.N = true;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x92 SUB A, D");
@@ -1969,7 +2230,7 @@ function run0x93() {
     //SUB A, E
     ram.A = alub8adder(ram.A, -ram.E, 1, 0, -1, -1);
     ram.Flag.N = true;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x93 SUB A, E");
@@ -1980,7 +2241,7 @@ function run0x94() {
     //SUB A, H
     ram.A = alub8adder(ram.A, -ram.H, 1, 0, -1, -1);
     ram.Flag.N = true;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x94 SUB A, H");
@@ -1991,7 +2252,7 @@ function run0x95() {
     //SUB A, L
     ram.A = alub8adder(ram.A, -ram.L, 1, 0, -1, -1);
     ram.Flag.N = true;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x95 SUB A, L");
@@ -2000,9 +2261,9 @@ function run0x95() {
 }
 function run0x96() {
     //SUB A, (HL)
-    ram.A = alub8adder( ram.A, -read(ram.L + ram.H * 0b1_0000_0000), 1, 0, -1, -1 );
+    ram.A = alub8adder( ram.A, -read(ram.getHL()), 1, 0, -1, -1 );
     ram.Flag.N = true;
-    pos++;
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0x96 SUB A, (HL)");
@@ -2017,7 +2278,7 @@ function run0x97() {
     ram.Flag.N = true;
     ram.Flag.H = false;
     ram.Flag.C = false;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x97 SUB A, A");
@@ -2026,13 +2287,8 @@ function run0x97() {
 }
 function run0x98() {
     //SBC A, B
-    let car = 0;
-    if (ram.Flag.C) {
-        car = 1;
-    }
-    ram.A = alub8adder(ram.A, -(ram.B + car), 1, 0, -1, -1);
-    ram.Flag.N = true;
-    pos++;
+    sbcA(ram.B);
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x98 SBC A, B");
@@ -2041,13 +2297,8 @@ function run0x98() {
 }
 function run0x99() {
     //SBC A, C
-    let car = 0;
-    if (ram.Flag.C) {
-        car = 1;
-    }
-    ram.A = alub8adder(ram.A, -(ram.C + car), 1, 0, -1, -1);
-    ram.Flag.N = true;
-    pos++;
+    sbcA(ram.C);
+    
     if (cpu_dump_intstr === 1) {
         console.log("0x99 SBC A, C");
         console.log("A:" + ram.A.toString(16));
@@ -2055,13 +2306,8 @@ function run0x99() {
 }
 function run0x9A() {
     //SBC A, D
-    let car = 0;
-    if (ram.Flag.C) {
-        car = 1;
-    }
-    ram.A = alub8adder(ram.A, -(ram.D + car), 1, 0, -1, -1);
-    ram.Flag.N = true;
-    pos++;
+    sbcA(ram.D);
+    
     if (cpu_dump_intstr === 1) {
         console.log("0x9A SBC A, D");
         console.log("A:" + ram.A.toString(16));
@@ -2069,13 +2315,8 @@ function run0x9A() {
 }
 function run0x9B() {
     //SBC A, E
-    let car = 0;
-    if (ram.Flag.C) {
-        car = 1;
-    }
-    ram.A = alub8adder(ram.A, -(ram.E + car), 1, 0, -1, -1);
-    ram.Flag.N = true;
-    pos++;
+    sbcA(ram.E);
+    
     if (cpu_dump_intstr === 1) {
         console.log("0x9B SBC A, E");
         console.log("A:" + ram.A.toString(16));
@@ -2083,13 +2324,8 @@ function run0x9B() {
 }
 function run0x9C() {
     //SBC A, H
-    let car = 0;
-    if (ram.Flag.C) {
-        car = 1;
-    }
-    ram.A = alub8adder(ram.A, -(ram.H + car), 1, 0, -1, -1);
-    ram.Flag.N = true;
-    pos++;
+    sbcA(ram.H);
+    
     if (cpu_dump_intstr === 1) {
         console.log("0x9C SBC A, H");
         console.log("A:" + ram.A.toString(16));
@@ -2097,13 +2333,8 @@ function run0x9C() {
 }
 function run0x9D() {
     //SBC A, L
-    let car = 0;
-    if (ram.Flag.C) {
-        car = 1;
-    }
-    ram.A = alub8adder(ram.A, -(ram.L + car), 1, 0, -1, -1);
-    ram.Flag.N = true;
-    pos++;
+    sbcA(ram.L);
+    
     if (cpu_dump_intstr === 1) {
         console.log("0x9D SBC A, L");
         console.log("A:" + ram.A.toString(16));
@@ -2111,13 +2342,8 @@ function run0x9D() {
 }
 function run0x9E() {
     //SBC A, (HL)
-    let car = 0;
-    if (ram.Flag.C) {
-        car = 1;
-    }
-    ram.A = alub8adder(ram.A,    -(read(ram.L + ram.H * 0b1_0000_0000) + car), 1, 0, -1, -1 );
-    ram.Flag.N = true;
-    pos++;
+    sbcA(read(ram.getHL()));
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0x9E SBC A, (HL)");
@@ -2126,17 +2352,29 @@ function run0x9E() {
 }
 function run0x9F() {
     //SBC A, A
-    /*let car = 0;
+    let car = 0;
     if (ram.Flag.C) {
         car = 1;
     }
-    ram.A = alub8adder(ram.A, -(ram.A + car), 1, 0, -1, -1);*/
-    ram.A = 0xff;
-    ram.Flag.Z = false;
-    ram.Flag.N = true;
-    ram.Flag.H = true;
-    ram.Flag.C = true;
-    pos++;
+    let keepH = false;
+    let keepC = false;
+    let old_A = ram.A;
+    ram.A = alub8adder(ram.A, -car, 1, 0, -1, -1);
+    if (ram.Flag.H) {
+        keepH = true;
+    }
+    if (ram.Flag.C) {
+        keepC = true;
+    }
+    ram.A = alub8adder(ram.A, -old_A, 1, 0, -1, -1);
+    if (keepH) {
+        ram.Flag.H = true;
+    }
+    if (keepC) {
+        ram.Flag.C = true;
+    }
+    ram.Flag.N = false;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0x9F SBC A, A");
@@ -2154,7 +2392,7 @@ function run0xA0() {
     ram.Flag.N = false;
     ram.Flag.H = true;
     ram.Flag.C = false;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0xA0 AND A, B");
@@ -2172,7 +2410,7 @@ function run0xA1() {
     ram.Flag.N = false;
     ram.Flag.H = true;
     ram.Flag.C = false;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0xA1 AND A, C");
@@ -2190,7 +2428,7 @@ function run0xA2() {
     ram.Flag.N = false;
     ram.Flag.H = true;
     ram.Flag.C = false;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0xA2 AND A, D");
@@ -2208,7 +2446,7 @@ function run0xA3() {
     ram.Flag.N = false;
     ram.Flag.H = true;
     ram.Flag.C = false;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0xA3 AND A, E");
@@ -2226,7 +2464,7 @@ function run0xA4() {
     ram.Flag.N = false;
     ram.Flag.H = true;
     ram.Flag.C = false;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0xA4 AND A, H");
@@ -2244,7 +2482,7 @@ function run0xA5() {
     ram.Flag.N = false;
     ram.Flag.H = true;
     ram.Flag.C = false;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0xA5 AND A, L");
@@ -2253,7 +2491,7 @@ function run0xA5() {
 }
 function run0xA6() {
     //AND A, (HL)
-    ram.A = ram.A & read(ram.L + ram.H * 0b1_0000_0000);
+    ram.A = ram.A & read(ram.getHL());
     if (ram.A === 0) {
         ram.Flag.Z = true;
     } else {
@@ -2262,7 +2500,7 @@ function run0xA6() {
     ram.Flag.N = false;
     ram.Flag.H = true;
     ram.Flag.C = false;
-    pos++;
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0xA6 AND A, (HL)");
@@ -2279,7 +2517,7 @@ function run0xA7() {
     ram.Flag.N = false;
     ram.Flag.H = true;
     ram.Flag.C = false;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0xA7 AND A, A");
@@ -2297,7 +2535,7 @@ function run0xA8() {
     ram.Flag.N = false;
     ram.Flag.H = false;
     ram.Flag.C = false;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0xA8 XOR A, B");
@@ -2315,7 +2553,7 @@ function run0xA9() {
     ram.Flag.N = false;
     ram.Flag.H = false;
     ram.Flag.C = false;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0xA9 XOR A, C");
@@ -2333,7 +2571,7 @@ function run0xAA() {
     ram.Flag.N = false;
     ram.Flag.H = false;
     ram.Flag.C = false;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0xAA XOR A, D");
@@ -2351,7 +2589,7 @@ function run0xAB() {
     ram.Flag.N = false;
     ram.Flag.H = false;
     ram.Flag.C = false;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0xAB XOR A, E");
@@ -2369,7 +2607,7 @@ function run0xAC() {
     ram.Flag.N = false;
     ram.Flag.H = false;
     ram.Flag.C = false;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0xAC XOR A, H");
@@ -2387,7 +2625,7 @@ function run0xAD() {
     ram.Flag.N = false;
     ram.Flag.H = false;
     ram.Flag.C = false;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0xAD XOR A, L");
@@ -2396,7 +2634,7 @@ function run0xAD() {
 }
 function run0xAE() {
     //XOR A, (HL)
-    ram.A = ram.A ^ read(ram.L + ram.H * 0b1_0000_0000);
+    ram.A = ram.A ^ read(ram.getHL());
     if (ram.A === 0) {
         ram.Flag.Z = true;
     } else {
@@ -2405,7 +2643,7 @@ function run0xAE() {
     ram.Flag.N = false;
     ram.Flag.H = false;
     ram.Flag.C = false;
-    pos++;
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0xAE XOR A, (HL)");
@@ -2419,7 +2657,7 @@ function run0xAF() {
     ram.Flag.N = false;
     ram.Flag.H = false;
     ram.Flag.C = false;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0xAF XOR A, A");
@@ -2437,7 +2675,7 @@ function run0xB0() {
     ram.Flag.N = false;
     ram.Flag.H = false;
     ram.Flag.C = false;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0xB0 OR A, B");
@@ -2455,7 +2693,7 @@ function run0xB1() {
     ram.Flag.N = false;
     ram.Flag.H = false;
     ram.Flag.C = false;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0xB1 OR A, C");
@@ -2473,7 +2711,7 @@ function run0xB2() {
     ram.Flag.N = false;
     ram.Flag.H = false;
     ram.Flag.C = false;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0xB2 OR A, D");
@@ -2491,7 +2729,7 @@ function run0xB3() {
     ram.Flag.N = false;
     ram.Flag.H = false;
     ram.Flag.C = false;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0xB3 OR A, E");
@@ -2509,7 +2747,7 @@ function run0xB4() {
     ram.Flag.N = false;
     ram.Flag.H = false;
     ram.Flag.C = false;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0xB4 OR A, H");
@@ -2527,7 +2765,7 @@ function run0xB5() {
     ram.Flag.N = false;
     ram.Flag.H = false;
     ram.Flag.C = false;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0xB5 OR A, L");
@@ -2536,7 +2774,7 @@ function run0xB5() {
 }
 function run0xB6() {
     //OR A, (HL)
-    ram.A = ram.A | read(ram.L + ram.H * 0b1_0000_0000);
+    ram.A = ram.A | read(ram.getHL());
     if (ram.A === 0) {
         ram.Flag.Z = true;
     } else {
@@ -2545,7 +2783,7 @@ function run0xB6() {
     ram.Flag.N = false;
     ram.Flag.H = false;
     ram.Flag.C = false;
-    pos++;
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0xB6 OR A, (HL)");
@@ -2562,7 +2800,7 @@ function run0xB7() {
     ram.Flag.N = false;
     ram.Flag.H = false;
     ram.Flag.C = false;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0xB7 OR A, A");
@@ -2586,7 +2824,7 @@ function run0xB8() {
     } else {
         ram.Flag.C = false;
     }
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0xB8 CP A, B");
@@ -2610,7 +2848,7 @@ function run0xB9() {
     } else {
         ram.Flag.C = false;
     }
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0xB9 CP A, C");
@@ -2634,7 +2872,7 @@ function run0xBA() {
     } else {
         ram.Flag.C = false;
     }
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0xBA CP A, D");
@@ -2658,7 +2896,7 @@ function run0xBB() {
     } else {
         ram.Flag.C = false;
     }
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0xBB CP A, E");
@@ -2682,7 +2920,7 @@ function run0xBC() {
     } else {
         ram.Flag.C = false;
     }
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0xBC CP A, H");
@@ -2706,7 +2944,7 @@ function run0xBD() {
     } else {
         ram.Flag.C = false;
     }
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0xBD CP A, L");
@@ -2714,7 +2952,7 @@ function run0xBD() {
 }
 function run0xBE() {
     //CP A, (HL)
-    let rd = read(ram.L + ram.H * 0b1_0000_0000);
+    let rd = read(ram.getHL());
     if (ram.A === rd) {
         ram.Flag.Z = true;
     } else {
@@ -2731,7 +2969,7 @@ function run0xBE() {
     } else {
         ram.Flag.C = false;
     }
-    pos++;
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0xBE CP A, (HL)");
@@ -2744,7 +2982,7 @@ function run0xBF() {
     ram.Flag.N = true;
     ram.Flag.H = false;
     ram.Flag.C = false;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0xBF CP A, A");
@@ -2754,10 +2992,10 @@ function run0xC0() {
     //RET NZ
     if (!ram.Flag.Z) {
         let ret = stackpopb16();
-        pos = ret[0] + ret[1] * 0b1_0000_0000;
+        pos = combine_2b8(ret[0], ret[1]);
         cycles += 20;
     } else {
-        pos++;
+        
         cycles += 8;
     }
     if (cpu_dump_intstr === 1) {
@@ -2768,9 +3006,8 @@ function run0xC0() {
 function run0xC1() {
     //POP BC
     let ret = stackpopb16();
-    ram.B = ret[1];
-    ram.C = ret[0];
-    pos++;
+    ram.setBC(combine_2b8(ret[0], ret[1]));
+    
     cycles += 12;
     if (cpu_dump_intstr === 1) {
         console.log("0xC1 POP BC");
@@ -2779,16 +3016,14 @@ function run0xC1() {
 }
 function run0xC2() {
     //JP NZ, nn
-    pos++;
-    let n1 = read(pos);
-    pos++;
-    let n2 = read(pos);
+    let n1 = get_byte();
+    let n2 = get_byte();
     if (!ram.Flag.Z) {
-        pos = n1 + n2 * 0b1_0000_0000;
+        pos = combine_2b8(n2, n1);
         cycles += 16;
     } else {
         cycles += 12;
-        pos++;
+        
     }
     if (cpu_dump_intstr === 1) {
         console.log("0xC2 JP NZ,nn");
@@ -2797,13 +3032,11 @@ function run0xC2() {
 }
 function run0xC3() {
     //JP nn
-    pos++;
-    let n1 = read(pos);
-    pos++;
-    let n2 = read(pos);
-    pos = n1 + n2 * 0b1_0000_0000;
+    let n1 = get_byte();
+    let n2 = get_byte();
+    pos = combine_2b8(n2, n1);
     cycles += 16;
-    //pos++;
+    
     if (cpu_dump_intstr === 1) {
         console.log("0xC3 JP nn");
         console.log("PC:" + pos.toString(16));
@@ -2811,14 +3044,13 @@ function run0xC3() {
 }
 function run0xC4() {
     //CALL NZ, nn
-    pos++;
-    let n1 = read(pos);
-    pos++;
-    let n2 = read(pos);
-    pos++;
+    let n1 = get_byte();
+    let n2 = get_byte();
+    
     if (!ram.Flag.Z) {
-        stackpushb16([pos & 0b0000_0000_1111_1111,(pos & 0b1111_1111_0000_0000) >> 8]);
-        pos = n1 + n2 * 0b1_0000_0000;
+        let ret = split_b16(pos);
+        stackpushb16([ret[0], ret[1]]);
+        pos = combine_2b8(n2, n1);
         cycles += 24;
     } else {
         cycles += 12;
@@ -2830,8 +3062,8 @@ function run0xC4() {
 }
 function run0xC5() {
     //PUSH BC
-    stackpushb16([ram.C, ram.B]);
-    pos++;
+    stackpushb16([ram.B, ram.C]);
+    
     cycles += 16;
     if (cpu_dump_intstr === 1) {
         console.log("0xC5 PUSH BC");
@@ -2839,10 +3071,9 @@ function run0xC5() {
 }
 function run0xC6() {
     //ADD A, n
-    pos++;
-    ram.A = alub8adder(ram.A, read(pos), 1, 0, 1, 1);
+    ram.A = alub8adder(ram.A, get_byte(), 1, 0, 1, 1);
     ram.Flag.N = false;
-    pos++;
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0xC6 ADD A, n");
@@ -2851,8 +3082,8 @@ function run0xC6() {
 }
 function run0xC7() {
     //RST 00
-    pos++;
-    stackpushb16([pos & 0b0000_0000_1111_1111,(pos & 0b1111_1111_0000_0000) >> 8]);
+    
+    stackpushb16(split_b16(pos));
     pos = 0x00;
     cycles += 16;
     if (cpu_dump_intstr === 1) {
@@ -2864,10 +3095,10 @@ function run0xC8() {
     //RET Z
     if (ram.Flag.Z) {
         let ret = stackpopb16();
-        pos = ret[0] + ret[1] * 0b1_0000_0000;
+        pos = combine_2b8(ret[0], ret[1]);
         cycles += 20;
     } else {
-        pos++;
+        
         cycles += 8;
     }
     if (cpu_dump_intstr === 1) {
@@ -2878,7 +3109,7 @@ function run0xC8() {
 function run0xC9() {
     //RET
     let ret = stackpopb16();
-    pos = ret[0] + ret[1] * 0b1_0000_0000;
+    pos = combine_2b8(ret[0], ret[1]);
     cycles += 16;
     if (cpu_dump_intstr === 1) {
         console.log("0xC9 RET");
@@ -2887,15 +3118,13 @@ function run0xC9() {
 }
 function run0xCA() {
     //JP Z, nn
-    pos++;
-    let n1 = read(pos);
-    pos++;
-    let n2 = read(pos);
+    let n1 = get_byte();
+    let n2 = get_byte();
     if (ram.Flag.Z) {
-        pos = n1 + n2 * 0b1_0000_0000;
+        pos = combine_2b8(n2, n1);
         cycles += 16;
     } else {
-        pos++;
+        
         cycles += 12;
     }
     if (cpu_dump_intstr === 1) {
@@ -2910,8 +3139,8 @@ function run0xCB() {
     Flag.N = ram.Flag.N;
     Flag.H = ram.Flag.H;
     Flag.C = ram.Flag.C;
-    pos++;
-    let instruct = read(pos);
+    
+    let instruct = get_byte();
     if (cpu_dump_intstr === 1) {
         console.log(pos.toString(16) + ": CB " + instruct.toString(16));
     }
@@ -2938,9 +3167,9 @@ function run0xCB() {
             case 6:
                 cycles += 8;
                 if (instruct >= 0x40 && instruct < 0x80) {
-                    cb_array[(instruct & 0b1111_1000) >> 3](read(ram.L + ram.H * 0b1_0000_0000));
+                    cb_array[(instruct & 0b1111_1000) >> 3](read(ram.getHL()));
                 } else {
-                    write(ram.L + ram.H * 0b1_0000_0000, cb_array[(instruct & 0b1111_1000) >> 3](read(ram.L + ram.H * 0b1_0000_0000)));
+                    write(ram.getHL(), cb_array[(instruct & 0b1111_1000) >> 3](read(ram.getHL())));
                 }
                 break;
             case 7:
@@ -2967,9 +3196,9 @@ function run0xCB() {
             case 14:
                 cycles += 8;
                 if (instruct >= 0x40 && instruct < 0x80) {
-                    cb_array[(instruct & 0b1111_1000) >> 3](read(ram.L + ram.H * 0b1_0000_0000));
+                    cb_array[(instruct & 0b1111_1000) >> 3](read(ram.getHL()));
                 } else {
-                    write(ram.L + ram.H * 0b1_0000_0000, cb_array[(instruct & 0b1111_1000) >> 3]( read(ram.L + ram.H * 0b1_0000_0000) ) );
+                    write(ram.getHL(), cb_array[(instruct & 0b1111_1000) >> 3]( read(ram.getHL()) ) );
                 }
                 break;
             case 15:
@@ -3002,9 +3231,9 @@ function run0xCB() {
                 case 6:
                     cycles += 8;
                     if (instruct >= 0x40 && instruct < 0x80) {
-                        cb_array[(instruct & 0b1111_1000) >> 3](read(ram.L + ram.H * 0b1_0000_0000));
+                        cb_array[(instruct & 0b1111_1000) >> 3](read(ram.getHL()));
                     } else {
-                        write(ram.L + ram.H * 0b1_0000_0000, cb_array[(instruct & 0b1111_1000) >> 3](read(ram.L + ram.H * 0b1_0000_0000)));
+                        write(ram.getHL(), cb_array[(instruct & 0b1111_1000) >> 3](read(ram.getHL())));
                     }
                     break;
                 case 7:
@@ -3031,11 +3260,11 @@ function run0xCB() {
                 case 14:
                     cycles += 8;
                     if (instruct >= 0x40 && instruct < 0x80) {
-                        cb_array[(instruct & 0b1111_1000) >> 3](read(ram.L + ram.H * 0b1_0000_0000));
+                        cb_array[(instruct & 0b1111_1000) >> 3](read(ram.getHL()));
                     } else {
                         write(
-                            ram.L + ram.H * 0b1_0000_0000,
-                            cb_array[(instruct & 0b1111_1000) >> 3](read(ram.L + ram.H * 0b1_0000_0000))
+                            ram.getHL(),
+                            cb_array[(instruct & 0b1111_1000) >> 3](read(ram.getHL()))
                         );
                     }
                     break;
@@ -3052,7 +3281,7 @@ function run0xCB() {
             return;
         }
     }
-    pos++;
+    
     ram.Flag.Z = Flag.Z;
     ram.Flag.N = Flag.N;
     ram.Flag.H = Flag.H;
@@ -3060,14 +3289,11 @@ function run0xCB() {
 }
 function run0xCC() {
     //CALL Z, nn
-    pos++;
-    let n1 = read(pos);
-    pos++;
-    let n2 = read(pos);
-    pos++;
+    let n1 = get_byte();
+    let n2 = get_byte();
     if (ram.Flag.Z) {
-        stackpushb16([     pos & 0b0000_0000_1111_1111,     (pos & 0b1111_1111_0000_0000) >> 8 ]);
-        pos = n1 + n2 * 0b1_0000_0000;
+        stackpushb16(split_b16(pos));
+        pos = combine_2b8(n2, n1);
         cycles += 24;
     } else {
         cycles += 12;
@@ -3079,13 +3305,11 @@ function run0xCC() {
 }
 function run0xCD() {
     //CALL nn
-    pos++;
-    let n1 = read(pos);
-    pos++;
-    let n2 = read(pos);
-    pos++;
-    stackpushb16([ pos & 0b0000_0000_1111_1111, (pos & 0b1111_1111_0000_0000) >> 8]);
-    pos = n1 + n2 * 0b1_0000_0000;
+    let n1 = get_byte();
+    let n2 = get_byte();
+    
+    stackpushb16(split_b16(pos));
+    pos = combine_2b8(n2, n1);
     cycles += 24;
     if (cpu_dump_intstr === 1) {
         console.log("0xCD CALL nn");
@@ -3098,10 +3322,24 @@ function run0xCE() {
     if (ram.Flag.C) {
         car = 1;
     }
-    pos++;
-    ram.A = alub8adder(ram.A, read(pos) + car, 1, 0, 1, 1);
+    let keepH = false;
+    let keepC = false;
+    let to_add = alub8adder(get_byte(), car, 1, 0, 1, 1);
+    if (ram.Flag.H) {
+        keepH = true;
+    }
+    if (ram.Flag.C) {
+        keepC = true;
+    }
+    ram.A = alub8adder(ram.A, to_add, 1, 0, 1, 1);
+    if (keepH) {
+        ram.Flag.H = true;
+    }
+    if (keepC) {
+        ram.Flag.C = true;
+    }
     ram.Flag.N = false;
-    pos++;
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0xCE ADC A, n");
@@ -3110,8 +3348,8 @@ function run0xCE() {
 }
 function run0xCF() {
     //RST 08
-    pos++;
-    stackpushb16([ pos & 0b0000_0000_1111_1111, (pos & 0b1111_1111_0000_0000) >> 8]);
+    
+    stackpushb16(split_b16(pos));
     pos = 0x08;
     cycles += 16;
     if (cpu_dump_intstr === 1) {
@@ -3123,10 +3361,10 @@ function run0xD0() {
     //RET NC
     if (!ram.Flag.C) {
         let ret = stackpopb16();
-        pos = ret[0] + ret[1] * 0b1_0000_0000;
+        pos = combine_2b8(ret[0], ret[1]);
         cycles += 20;
     } else {
-        pos++;
+        
         cycles += 8;
     }
     if (cpu_dump_intstr === 1) {
@@ -3137,9 +3375,8 @@ function run0xD0() {
 function run0xD1() {
     //POP DE
     let ret = stackpopb16();
-    ram.D = ret[1];
-    ram.E = ret[0];
-    pos++;
+    ram.setDE(combine_2b8(ret[0], ret[1]));
+    
     cycles += 12;
     if (cpu_dump_intstr === 1) {
         console.log("0xD1 POP DE");
@@ -3148,15 +3385,13 @@ function run0xD1() {
 }
 function run0xD2() {
     //JP NC, nn
-    pos++;
-    let n1 = read(pos);
-    pos++;
-    let n2 = read(pos);
+    let n1 = get_byte();
+    let n2 = get_byte();
     if (!ram.Flag.C) {
-        pos = n1 + n2 * 0b1_0000_0000;
+        pos = combine_2b8(n2, n1);
         cycles += 16;
     } else {
-        pos++;
+        
         cycles += 12;
     }
     if (cpu_dump_intstr === 1) {
@@ -3171,14 +3406,12 @@ function run0xD3() {
 }
 function run0xD4() {
     //CALL NC, nn
-    pos++;
-    let n1 = read(pos);
-    pos++;
-    let n2 = read(pos);
-    pos++;
+    let n1 = get_byte();
+    let n2 = get_byte();
+    
     if (!ram.Flag.C) {
-        stackpushb16([     pos & 0b0000_0000_1111_1111,     (pos & 0b1111_1111_0000_0000) >> 8 ]);
-        pos = n1 + n2 * 0b1_0000_0000;
+        stackpushb16(split_b16(pos));
+        pos = combine_2b8(n2, n1);
         cycles += 24;
     } else {
         cycles += 12;
@@ -3190,8 +3423,8 @@ function run0xD4() {
 }
 function run0xD5() {
     //PUSH DE
-    stackpushb16([ram.E, ram.D]);
-    pos++;
+    stackpushb16([ram.D, ram.E]);
+    
     cycles += 16;
     if (cpu_dump_intstr === 1) {
         console.log("0xD5 PUSH DE");
@@ -3199,10 +3432,9 @@ function run0xD5() {
 }
 function run0xD6() {
     //SUB A, n
-    pos++;
-    ram.A = alub8adder(ram.A, -read(pos), 1, 0, -1, -1);
+    ram.A = alub8adder(ram.A, -get_byte(), 1, 0, -1, -1);
     ram.Flag.N = true;
-    pos++;
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0xD6 SUB A, n");
@@ -3211,8 +3443,8 @@ function run0xD6() {
 }
 function run0xD7() {
     //RST 10
-    pos++;
-    stackpushb16([ pos & 0b0000_0000_1111_1111, (pos & 0b1111_1111_0000_0000) >> 8]);
+
+    stackpushb16(split_b16(pos));
     pos = 0x10;
     cycles += 16;
     if (cpu_dump_intstr === 1) {
@@ -3224,11 +3456,11 @@ function run0xD8() {
     //RET C
     if (ram.Flag.C) {
         let ret = stackpopb16();
-        pos = ret[0] + ret[1] * 0b1_0000_0000;
+        pos = combine_2b8(ret[0], ret[1]);
         cycles += 20;
     } else {
         cycles += 8;
-        pos++;
+        
     }
     if (cpu_dump_intstr === 1) {
         console.log("0xD8 RET C");
@@ -3237,9 +3469,9 @@ function run0xD8() {
 }
 function run0xD9() {
     //RETI
-    pos++;
+    
     let ret = stackpopb16();
-    pos = ret[0] + ret[1] * 0b1_0000_0000;
+    pos = combine_2b8(ret[0], ret[1]);
     interrupts = true;
     cycles += 16;
     if (cpu_dump_intstr === 1) {
@@ -3249,15 +3481,13 @@ function run0xD9() {
 }
 function run0xDA() {
     //JP C, nn
-    pos++;
-    let n1 = read(pos);
-    pos++;
-    let n2 = read(pos);
+    let n1 = get_byte();
+    let n2 = get_byte();
     if (ram.Flag.C) {
-        pos = n1 + n2 * 0b1_0000_0000;
+        pos = combine_2b8(n2, n1);
         cycles += 16;
     } else {
-        pos++;
+        
         cycles += 12;
     }
     if (cpu_dump_intstr === 1) {
@@ -3272,14 +3502,12 @@ function run0xDB() {
 }
 function run0xDC() {
     //CALL C, nn
-    pos++;
-    let n1 = read(pos);
-    pos++;
-    let n2 = read(pos);
-    pos++;
+    let n1 = get_byte();
+    let n2 = get_byte();
+    
     if (ram.Flag.C) {
-        stackpushb16([     pos & 0b0000_0000_1111_1111,     (pos & 0b1111_1111_0000_0000) >> 8]);
-        pos = n1 + n2 * 0b1_0000_0000;
+        stackpushb16(split_b16(pos));
+        pos = combine_2b8(n2, n1);
         cycles += 24;
     } else {
         cycles += 12;
@@ -3296,14 +3524,8 @@ function run0xDD() {
 }
 function run0xDE() {
     //SBC A, n
-    let car = 0;
-    if (ram.Flag.C) {
-        car = 1;
-    }
-    pos++;
-    ram.A = alub8adder(ram.A, -(read(pos) + car), 1, 0, -1, -1);
-    ram.Flag.N = true;
-    pos++;
+    sbcA(get_byte());
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0xDE SBC A, n");
@@ -3312,8 +3534,8 @@ function run0xDE() {
 }
 function run0xDF() {
     //RST 18
-    pos++;
-    stackpushb16([ pos & 0b0000_0000_1111_1111, (pos & 0b1111_1111_0000_0000) >> 8]);
+    
+    stackpushb16(split_b16(pos));
     pos = 0x18;
     cycles += 16;
     if (cpu_dump_intstr === 1) {
@@ -3323,9 +3545,8 @@ function run0xDF() {
 }
 function run0xE0() {
     //LDH (n), A
-    pos++;
-    write(0xff00 + read(pos), ram.A);
-    pos++;
+    write(0xff00 + get_byte(), ram.A);
+    
     cycles += 12;
     if (cpu_dump_intstr === 1) {
         console.log("0xE0 LDH (n), A");
@@ -3335,9 +3556,8 @@ function run0xE0() {
 function run0xE1() {
     //POP HL
     let ret = stackpopb16();
-    ram.H = ret[1];
-    ram.L = ret[0];
-    pos++;
+    ram.setHL(combine_2b8(ret[0], ret[1]));
+    
     cycles += 12;
     if (cpu_dump_intstr === 1) {
         console.log("0xE1 POP HL");
@@ -3347,7 +3567,7 @@ function run0xE1() {
 function run0xE2() {
     //LDH (C), A
     write(0xff00 + ram.C, ram.A);
-    pos++;
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0xE2 LDH (C), A");
@@ -3366,8 +3586,8 @@ function run0xE4() {
 }
 function run0xE5() {
     //PUSH HL
-    stackpushb16([ram.L, ram.H]);
-    pos++;
+    stackpushb16([ram.H, ram.L]);
+    
     cycles += 16;
     if (cpu_dump_intstr === 1) {
         console.log("0xE5 PUSH HL");
@@ -3375,8 +3595,7 @@ function run0xE5() {
 }
 function run0xE6() {
     //AND A, n
-    pos++;
-    ram.A = ram.A & read(pos);
+    ram.A = ram.A & get_byte();
     if (ram.A === 0) {
         ram.Flag.Z = true;
     } else {
@@ -3385,7 +3604,7 @@ function run0xE6() {
     ram.Flag.N = false;
     ram.Flag.H = true;
     ram.Flag.C = false;
-    pos++;
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0xE6 AND A, n");
@@ -3394,8 +3613,8 @@ function run0xE6() {
 }
 function run0xE7() {
     //RST 20
-    pos++;
-    stackpushb16([ pos & 0b0000_0000_1111_1111, (pos & 0b1111_1111_0000_0000) >> 8]);
+    
+    stackpushb16(split_b16(pos));
     pos = 0x20;
     cycles += 16;
     if (cpu_dump_intstr === 1) {
@@ -3405,15 +3624,14 @@ function run0xE7() {
 }
 function run0xE8() {
     //ADD SP, n
-    pos++;
-    let signed = read(pos);
+    let signed = get_byte();
     if (signed >= 0b1000_0000) {
         signed = -(~(signed - 1) & 0b1111_1111);
     }
     ram.SP = alub16adder(ram.SP, [0, signed], 0, 0, 1, 1);
     ram.Flag.Z = false;
     ram.Flag.N = false;
-    pos++;
+    
     cycles += 16;
     if (cpu_dump_intstr === 1) {
         console.log("0xE8 ADD SP, n");
@@ -3422,8 +3640,8 @@ function run0xE8() {
 }
 function run0xE9() {
     //JP HL
-    pos = ram.L + ram.H * 0b1_0000_0000;
-    //pos++;
+    pos = ram.getHL();
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0xE9 JP HL");
@@ -3432,12 +3650,10 @@ function run0xE9() {
 }
 function run0xEA() {
     //LD (nn), A
-    pos++;
-    let n1 = read(pos);
-    pos++;
-    let n2 = read(pos);
-    write(n1 + n2 * 0b1_0000_0000, ram.A);
-    pos++;
+    let n1 = get_byte();
+    let n2 = get_byte();
+    write(combine_2b8(n2, n1), ram.A);
+    
     cycles += 16;
     if (cpu_dump_intstr === 1) {
         console.log("0xEA    LD (nn), A");
@@ -3461,8 +3677,7 @@ function run0xED() {
 }
 function run0xEE() {
     //XOR A, n
-    pos++;
-    ram.A = ram.A ^ read(pos);
+    ram.A = ram.A ^ get_byte();
     if (ram.A === 0) {
         ram.Flag.Z = true;
     } else {
@@ -3471,7 +3686,7 @@ function run0xEE() {
     ram.Flag.N = false;
     ram.Flag.H = false;
     ram.Flag.C = false;
-    pos++;
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0xEE XOR A, n");
@@ -3480,8 +3695,8 @@ function run0xEE() {
 }
 function run0xEF() {
     //RST 28
-    pos++;
-    stackpushb16([ pos & 0b0000_0000_1111_1111, (pos & 0b1111_1111_0000_0000) >> 8]);
+    
+    stackpushb16(split_b16(pos));
     pos = 0x28;
     cycles += 16;
     if (cpu_dump_intstr === 1) {
@@ -3491,9 +3706,8 @@ function run0xEF() {
 }
 function run0xF0() {
     //LDH A, (n)
-    pos++;
-    ram.A = read(0xff00 + read(pos));
-    pos++;
+    ram.A = read(0xff00 + get_byte());
+    
     cycles += 12;
     if (cpu_dump_intstr === 1) {
         console.log("0xF0 LDH A, (n)");
@@ -3503,12 +3717,12 @@ function run0xF0() {
 function run0xF1() {
     //POP AF
     let ret = stackpopb16();
-    ram.A = ret[1];
-    ram.Flag.Z = Boolean((ret[0] & 0b1000_0000) >> 7 === 1);
-    ram.Flag.N = Boolean((ret[0] & 0b0100_0000) >> 6 === 1);
-    ram.Flag.H = Boolean((ret[0] & 0b0010_0000) >> 5 === 1);
-    ram.Flag.C = Boolean((ret[0] & 0b0001_0000) >> 4 === 1);
-    pos++;
+    ram.A = ret[0];
+    ram.Flag.Z = Boolean((ret[1] & 0b1000_0000) >> 7 === 1);
+    ram.Flag.N = Boolean((ret[1] & 0b0100_0000) >> 6 === 1);
+    ram.Flag.H = Boolean((ret[1] & 0b0010_0000) >> 5 === 1);
+    ram.Flag.C = Boolean((ret[1] & 0b0001_0000) >> 4 === 1);
+    
     cycles += 12;
     if (cpu_dump_intstr === 1) {
         console.log("0xF1 POP AF");
@@ -3518,7 +3732,7 @@ function run0xF1() {
 function run0xF2() {
     //LDH A, (C)
     ram.A = read(0xff00 + ram.C);
-    pos++;
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0xF2 LDH A, (C)");
@@ -3528,7 +3742,7 @@ function run0xF2() {
 function run0xF3() {
     //DI
     interrupts = false;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0xF3 DI");
@@ -3557,8 +3771,8 @@ function run0xF5() {
     if (ram.Flag.C) {
         c = 1;
     }
-    stackpushb16([ z * 0b1000_0000 + n * 0b0100_0000 + h * 0b0010_0000 + c * 0b0001_0000, ram.A]);
-    pos++;
+    stackpushb16([ram.A, (z * 0b1000_0000 + n * 0b0100_0000 + h * 0b0010_0000 + c * 0b0001_0000)]);
+    
     cycles += 16;
     if (cpu_dump_intstr === 1) {
         console.log("0xF5 PUSH AF");
@@ -3566,8 +3780,7 @@ function run0xF5() {
 }
 function run0xF6() {
     //OR A, n
-    pos++;
-    ram.A = ram.A | read(pos);
+    ram.A = ram.A | get_byte();
     if (ram.A === 0) {
         ram.Flag.Z = true;
     } else {
@@ -3576,7 +3789,7 @@ function run0xF6() {
     ram.Flag.N = false;
     ram.Flag.H = false;
     ram.Flag.C = false;
-    pos++;
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0xF6 OR A, n");
@@ -3585,11 +3798,8 @@ function run0xF6() {
 }
 function run0xF7() {
     //RST 30
-    pos++;
-    stackpushb16([
-        pos & 0b0000_0000_1111_1111,
-        (pos & 0b1111_1111_0000_0000) >> 8
-    ]);
+    
+    stackpushb16(split_b16(pos));
     pos = 0x30;
     cycles += 16;
     if (cpu_dump_intstr === 1) {
@@ -3599,17 +3809,15 @@ function run0xF7() {
 }
 function run0xF8() {
     //LD HL, SP+n
-    pos++;
-    let signed = read(pos);
+    let signed = get_byte();
     if (signed >= 0b1000_0000) {
         signed = -(~(signed - 1) & 0b1111_1111);
     }
     let ret = alub16adder([ram.SP[0], ram.SP[1]], [0, signed], 0, 0, 1, 1);
     ram.Flag.Z = false;
     ram.Flag.N = false;
-    ram.H = ret[0];
-    ram.L = ret[1];
-    pos++;
+    ram.setHL(combine_2b8(ret[0], ret[1]));
+    
     cycles += 12;
     if (cpu_dump_intstr === 1) {
         console.log("0xF8 LD HL, SP+n");
@@ -3618,7 +3826,7 @@ function run0xF8() {
 }
 function run0xF9() {
     //LD SP, HL
-    pos++;
+    
     ram.SP = [ram.H, ram.L];
     cycles += 8;
     if (cpu_dump_intstr === 1) {
@@ -3628,12 +3836,10 @@ function run0xF9() {
 }
 function run0xFA() {
     //LD A, (nn)
-    pos++;
-    let n1 = read(pos);
-    pos++;
-    let n2 = read(pos);
-    ram.A = read(n1 + n2 * 0b1_0000_0000);
-    pos++;
+    let n1 = get_byte();
+    let n2 = get_byte();
+    ram.A = read(combine_2b8(n2, n1));
+    
     cycles += 16;
     if (cpu_dump_intstr === 1) {
         console.log("0xFA LD A, (nn)");
@@ -3643,7 +3849,7 @@ function run0xFA() {
 function run0xFB() {
     //EI
     interrupts = true;
-    pos++;
+    
     cycles += 4;
     if (cpu_dump_intstr === 1) {
         console.log("0xFB EI");
@@ -3661,8 +3867,7 @@ function run0xFD() {
 }
 function run0xFE() {
     //CP A, n
-    pos++;
-    let rd = read(pos);
+    let rd = get_byte();
     if (ram.A === rd) {
         ram.Flag.Z = true;
     } else {
@@ -3679,7 +3884,7 @@ function run0xFE() {
     } else {
         ram.Flag.C = false;
     }
-    pos++;
+    
     cycles += 8;
     if (cpu_dump_intstr === 1) {
         console.log("0xFE CP A, n");
@@ -3688,11 +3893,8 @@ function run0xFE() {
 }
 function run0xFF() {
     //RST 38
-    pos++;
-    stackpushb16([
-        pos & 0b0000_0000_1111_1111,
-        (pos & 0b1111_1111_0000_0000) >> 8
-    ]);
+    
+    stackpushb16(split_b16(pos));
     pos = 0x38;
     cycles += 16;
     if (cpu_dump_intstr === 1) {
@@ -4007,7 +4209,7 @@ function prepare_cpu(rom) {
     //write(0xFFFF, 0, 0);
 }
 
-log_run.onclick = function () {
+function show_debug_log() {
     let i = log_pos.valueAsNumber;
     let last_instr = "";
     if (err_log[i].instr !== 0xcb) {
@@ -4015,7 +4217,44 @@ log_run.onclick = function () {
     } else {
         last_instr = " (CB " + err_log[i].arg1.toString(16).padStart(2, "0") + ") " + cb_array[(err_log[i].arg1 & 0b1111_1000) >> 3];
     }
-    singledisp.innerHTML = "<p>Old PC: 0x" + err_log[i].orgpos.toString(16).padStart(4, "0") + "<br>PC: 0x" + err_log[i].pos.toString(16).padStart(4, "0") + "<br>Flags: Z: " + err_log[i].Flag.Z + "<br>_______N: " + err_log[i].Flag.N + "<br>_______H: " + err_log[i].Flag.H + "<br>_______C: " + err_log[i].Flag.C + "<br>A: 0x" + err_log[i].A.toString(16).padStart(2, "0") + "<br>BC: 0x" + err_log[i].B.toString(16).padStart(2, "0") + err_log[i].C.toString(16).padStart(2, "0") + "<br>DE: 0x" + err_log[i].D.toString(16).padStart(2, "0") + err_log[i].E.toString(16).padStart(2, "0") + "<br>HL: 0x" + err_log[i].H.toString(16).padStart(2, "0") + err_log[i].L.toString(16).padStart(2, "0") + "<br>Old: A: 0x" + err_log[i - 1].A.toString(16).padStart(2, "0") + "<br>_____BC: 0x" + err_log[i - 1].B.toString(16).padStart(2, "0") + err_log[i - 1].C.toString(16).padStart(2, "0") + "<br>_____DE: 0x" + err_log[i - 1].D.toString(16).padStart(2, "0") + err_log[i - 1].E.toString(16).padStart(2, "0") + "<br>_____HL: 0x" + err_log[i - 1].H.toString(16).padStart(2, "0") + err_log[i - 1].L.toString(16).padStart(2, "0") + "<br>Stack Pointer: 0x" + err_log[i].SP[0].toString(16).padStart(2, "0") + err_log[i].SP[1].toString(16).padStart(2, "0") + "<br>Last Value: 0x" + err_log[i].instr.toString(16).padStart(2, "0") + "<br>Last Instruction: " + last_instr + "<br>Arg1: 0x" + err_log[i].arg1.toString(16).padStart(2, "0") + "_____Arg2: 0x" + err_log[i].arg2.toString(16).padStart(2, "0") + "<br><br><br><br><br><br><br><br><br></p>";
+    let super_string = "";
+    try {
+        super_string += "<p>Old PC: 0x" + err_log[i].orgpos.toString(16).padStart(4, "0");
+        super_string += "<br>PC: 0x" + err_log[i].pos.toString(16).padStart(4, "0")
+        super_string += "<br>Flags: Z: " + err_log[i].Flag.Z + "<br>_______N: " + err_log[i].Flag.N + "<br>_______H: " + err_log[i].Flag.H + "<br>_______C: " + err_log[i].Flag.C;
+        super_string += "<br>A: 0x" + err_log[i].A.toString(16).padStart(2, "0");
+        super_string += "<br>BC: 0x" + err_log[i].B.toString(16).padStart(2, "0") + err_log[i].C.toString(16).padStart(2, "0");
+        super_string += "<br>DE: 0x" + err_log[i].D.toString(16).padStart(2, "0") + err_log[i].E.toString(16).padStart(2, "0");
+        super_string += "<br>HL: 0x" + err_log[i].H.toString(16).padStart(2, "0") + err_log[i].L.toString(16).padStart(2, "0");
+        super_string += "<br>Old: A: 0x" + err_log[i - 1].A.toString(16).padStart(2, "0");
+        super_string += "<br>_____BC: 0x" + err_log[i - 1].B.toString(16).padStart(2, "0") + err_log[i - 1].C.toString(16).padStart(2, "0");
+        super_string += "<br>_____DE: 0x" + err_log[i - 1].D.toString(16).padStart(2, "0") + err_log[i - 1].E.toString(16).padStart(2, "0");
+        super_string += "<br>_____HL: 0x" + err_log[i - 1].H.toString(16).padStart(2, "0") + err_log[i - 1].L.toString(16).padStart(2, "0");
+    }
+    catch (err) {
+
+    }
+    try {
+        super_string += "<br>Stack Pointer: 0x" + err_log[i].SP[0].toString(16).padStart(2, "0") + err_log[i].SP[1].toString(16).padStart(2, "0");
+        super_string += "<br>Last Value: 0x" + err_log[i].instr.toString(16).padStart(2, "0");
+        super_string += "<br>Last Instruction: " + last_instr;
+        super_string += "<br>Arg1: 0x" + err_log[i].arg1.toString(16).padStart(2, "0");
+        super_string += "_____Arg2: 0x" + err_log[i].arg2.toString(16).padStart(2, "0");
+        super_string += "<br><br><br><br><br><br><br><br><br><br><br><br><br><br><br></p>";
+    }
+    catch (err) {
+
+    }
+    singledisp.innerHTML = super_string;
+};
+
+log_run.onclick = function () {
+    show_debug_log();
+    log_pos.value = log_pos.valueAsNumber + 1;
+};
+log_run_back.onclick = function () {
+    log_pos.value = log_pos.valueAsNumber - 2;
+    show_debug_log();
     log_pos.value = log_pos.valueAsNumber + 1;
 };
 
@@ -4334,7 +4573,7 @@ function interrupt_handle() {
         xff0f += 1;
         throw_vblank = 0;
         if (interrupts && (xffff & 1) === 1) {
-            stackpushb16([pos & 0b0000_0000_1111_1111, (pos & 0b1111_1111_0000_0000) >> 8]);
+            stackpushb16(split_b16(pos));
             pos = 0x40;
             interrupts = false;
             write(0xff0f, xff0f, 0);
@@ -4346,7 +4585,7 @@ function interrupt_handle() {
         xff0f += 0b10;
         throw_lcdc = -1;
         if (interrupts && (xffff & 0b10) >> 1 === 1) {
-            stackpushb16([pos & 0b0000_0000_1111_1111, (pos & 0b1111_1111_0000_0000) >> 8]);
+            stackpushb16(split_b16(pos));
             pos = 0x48;
             write(0xff0f, xff0f, 0);
             console.log("LCDC Scan Line Interrupt thrown");
@@ -4357,7 +4596,7 @@ function interrupt_handle() {
         xff0f += 0b100;
         throw_timer = 0;
         if (interrupts && (xffff & 0b100) >> 2 === 1) {
-            stackpushb16([pos & 0b0000_0000_1111_1111, (pos & 0b1111_1111_0000_0000) >> 8]);
+            stackpushb16(split_b16(pos));
             pos = 0x50;
             write(0xff0f, xff0f, 0);
             console.log("Timer Overflow Interrupt thrown");
@@ -4369,7 +4608,7 @@ function interrupt_handle() {
         xff0f += 0b100;
         throw_pchange = 0;
         if (interrupts && (xffff & 0b1_0000) >> 4 === 1) {
-            stackpushb16([pos & 0b0000_0000_1111_1111, (pos & 0b1111_1111_0000_0000) >> 8]);
+            stackpushb16(split_b16(pos));
             pos = 0x60;
             write(0xff0f, xff0f, 0);
             console.log("Key Input High-to-Low Interrupt thrown");
@@ -4388,7 +4627,51 @@ function disp_condition(orgpos) {
     } else {
         last_instr = " (CB) " + cb_array[(read(orgpos + 1) & 0b1111_1000) >> 3];
     }
-    singledisp.innerHTML = "<p>Old PC: 0x" + orgpos.toString(16).padStart(4, "0") + "<br>PC: 0x" + pos.toString(16).padStart(4, "0") + "<br>Flags: Z: " + ram.Flag.Z + "<br>_______N: " + ram.Flag.N + "<br>_______H: " + ram.Flag.H + "<br>_______C: " + ram.Flag.C + "<br>A: 0x" + ram.A.toString(16).padStart(2, "0") + "<br>BC: 0x" + ram.B.toString(16).padStart(2, "0") + ram.C.toString(16).padStart(2, "0") + "<br>DE: 0x" + ram.D.toString(16).padStart(2, "0") + ram.E.toString(16).padStart(2, "0") + "<br>HL: 0x" + ram.H.toString(16).padStart(2, "0") + ram.L.toString(16).padStart(2, "0") + "<br>Old: A: 0x" + old_ram.A.toString(16).padStart(2, "0") + "<br>_____BC: 0x" + old_ram.B.toString(16).padStart(2, "0") + old_ram.C.toString(16).padStart(2, "0") + "<br>_____DE: 0x" + old_ram.D.toString(16).padStart(2, "0") + old_ram.E.toString(16).padStart(2, "0") + "<br>_____HL: 0x" + old_ram.H.toString(16).padStart(2, "0") + old_ram.L.toString(16).padStart(2, "0") + "<br>Stack Pointer: 0x" + ram.SP[0].toString(16).padStart(2, "0") + ram.SP[1].toString(16).padStart(2, "0") + "<br>Last Value: 0x" + read(orgpos).toString(16).padStart(2, "0") + "<br>Last Instruction: " + last_instr + "<br>Arg1: 0x" + read(orgpos + 1, 0).toString(16).padStart(2, "0") + "_____Arg2: 0x" + read(orgpos + 2, 0)     .toString(16)     .padStart(2, "0") + "<br>0xFF40 LCD Display: 0x" + read(0xff40, 0).toString(2).padStart(8, "0") + "<br>0xFF41 LCD Status: 0x" + read(0xff41, 0).toString(2).padStart(8, "0") + "<br>0xFF44 Scan Line: " + read(0xff44, 0) + "<br>0xFF45 LYC Compare: " + read(0xff45, 0) + "<br>0xFF0F Interrupts Thrown: 0x" + read(0xff0f, 0).toString(2).padStart(8, "0") + "<br>0xFFFF Interrupt Enable: 0x" + read(0xffff, 0).toString(2).padStart(8, "0") + "<br>Master Interrupt Enable Register: " + interrupts + "<br>Square Wave 1: 0xFF10 0x" + read(0xff10, 0).toString(2).padStart(8, "0") + "    0xFF11: 0x" + read(0xff11, 0).toString(2).padStart(8, "0") + "    0xFF12: 0x" + read(0xff12, 0).toString(2).padStart(8, "0") + "    0xFF13: 0x" + read(0xff13, 0).toString(2).padStart(8, "0") + "    0xFF14: 0x" + read(0xff14, 0).toString(2).padStart(8, "0") + "<br>Square Wave 2: 0xFF15 0x" + read(0xff15, 0).toString(2).padStart(8, "0") + "    0xFF16: 0x" + read(0xff16, 0).toString(2).padStart(8, "0") + "    0xFF17: 0x" + read(0xff17, 0).toString(2).padStart(8, "0") + "    0xFF18: 0x" + read(0xff18, 0).toString(2).padStart(8, "0") + "    0xFF19: 0x" + read(0xff19, 0).toString(2).padStart(8, "0") + "<br>Wave Table: 0xFF1A 0x" + read(0xff1a, 0).toString(2).padStart(8, "0") + "    0xFF1B: 0x" + read(0xff1b, 0).toString(2).padStart(8, "0") + "    0xFF1C: 0x" + read(0xff1c, 0).toString(2).padStart(8, "0") + "    0xFF1D: 0x" + read(0xff1d, 0).toString(2).padStart(8, "0") + "    0xFF1E: 0x" + read(0xff1e, 0).toString(2).padStart(8, "0") + "<br>Noise Generator: 0xFF20: 0x" + read(0xff20, 0).toString(2).padStart(8, "0") + "    0xFF21: 0x" + read(0xff21, 0).toString(2).padStart(8, "0") + "    0xFF22: 0x" + read(0xff22, 0).toString(2).padStart(8, "0") + "    0xFF23: 0x" + read(0xff23, 0).toString(2).padStart(8, "0") + "<br><br><br></p>";
+    let super_string = "";
+    super_string += "<p>Old PC: 0x" + orgpos.toString(16).padStart(4, "0");
+    super_string += "<br>PC: 0x" + pos.toString(16).padStart(4, "0");
+    super_string += "<br>Flags: Z: " + ram.Flag.Z + "<br>_______N: " + ram.Flag.N + "<br>_______H: " + ram.Flag.H + "<br>_______C: " + ram.Flag.C + "<br>A: 0x";
+    super_string += ram.A.toString(16).padStart(2, "0");
+    super_string += "<br>BC: 0x" + ram.B.toString(16).padStart(2, "0") + ram.C.toString(16).padStart(2, "0");
+    super_string += "<br>DE: 0x" + ram.D.toString(16).padStart(2, "0") + ram.E.toString(16).padStart(2, "0");
+    super_string += "<br>HL: 0x" + ram.H.toString(16).padStart(2, "0") + ram.L.toString(16).padStart(2, "0");
+    super_string += "<br>Old: A: 0x" + old_ram.A.toString(16).padStart(2, "0");
+    super_string += "<br>_____BC: 0x" + old_ram.B.toString(16).padStart(2, "0") + old_ram.C.toString(16).padStart(2, "0");
+    super_string += "<br>_____DE: 0x" + old_ram.D.toString(16).padStart(2, "0") + old_ram.E.toString(16).padStart(2, "0");
+    super_string += "<br>_____HL: 0x" + old_ram.H.toString(16).padStart(2, "0") + old_ram.L.toString(16).padStart(2, "0");
+    super_string += "<br>Stack Pointer: 0x" + ram.SP[0].toString(16).padStart(2, "0") + ram.SP[1].toString(16).padStart(2, "0");
+    super_string += "<br>Last Value: 0x" + read(orgpos).toString(16).padStart(2, "0");
+    super_string += "<br>Last Instruction: " + last_instr;
+    super_string += "<br>Arg1: 0x" + read(orgpos + 1, 0).toString(16).padStart(2, "0");
+    super_string += "_____Arg2: 0x" + read(orgpos + 2, 0).toString(16).padStart(2, "0");
+    super_string += "<br>0xFF40 LCD Display: 0x" + read(0xff40, 0).toString(2).padStart(8, "0");
+    super_string += "<br>0xFF41 LCD Status: 0x" + read(0xff41, 0).toString(2).padStart(8, "0");
+    super_string += "<br>0xFF44 Scan Line: " + read(0xff44, 0);
+    super_string += "<br>0xFF45 LYC Compare: " + read(0xff45, 0);
+    super_string += "<br>0xFF0F Interrupts Thrown: 0x" + read(0xff0f, 0).toString(2).padStart(8, "0");
+    super_string += "<br>0xFFFF Interrupt Enable: 0x" + read(0xffff, 0).toString(2).padStart(8, "0");
+    super_string += "<br>Master Interrupt Enable Register: " + interrupts;
+    super_string += "<br>Square Wave 1: 0xFF10 0x" + read(0xff10, 0).toString(2).padStart(8, "0");
+    super_string += "    0xFF11: 0x" + read(0xff11, 0).toString(2).padStart(8, "0");
+    super_string += "    0xFF12: 0x" + read(0xff12, 0).toString(2).padStart(8, "0");
+    super_string += "    0xFF13: 0x" + read(0xff13, 0).toString(2).padStart(8, "0");
+    super_string += "    0xFF14: 0x" + read(0xff14, 0).toString(2).padStart(8, "0");
+    super_string += "<br>Square Wave 2: 0xFF15 0x" + read(0xff15, 0).toString(2).padStart(8, "0");
+    super_string += "    0xFF16: 0x" + read(0xff16, 0).toString(2).padStart(8, "0");
+    super_string += "    0xFF17: 0x" + read(0xff17, 0).toString(2).padStart(8, "0");
+    super_string += "    0xFF18: 0x" + read(0xff18, 0).toString(2).padStart(8, "0");
+    super_string += "    0xFF19: 0x" + read(0xff19, 0).toString(2).padStart(8, "0");
+    super_string += "<br>Wave Table: 0xFF1A 0x" + read(0xff1a, 0).toString(2).padStart(8, "0");
+    super_string += "    0xFF1B: 0x" + read(0xff1b, 0).toString(2).padStart(8, "0");
+    super_string += "    0xFF1C: 0x" + read(0xff1c, 0).toString(2).padStart(8, "0");
+    super_string += "    0xFF1D: 0x" + read(0xff1d, 0).toString(2).padStart(8, "0");
+    super_string += "    0xFF1E: 0x" + read(0xff1e, 0).toString(2).padStart(8, "0");
+    super_string += "<br>Noise Generator: 0xFF20: 0x" + read(0xff20, 0).toString(2).padStart(8, "0");
+    super_string += "    0xFF21: 0x" + read(0xff21, 0).toString(2).padStart(8, "0");
+    super_string += "    0xFF22: 0x" + read(0xff22, 0).toString(2).padStart(8, "0");
+    super_string += "    0xFF23: 0x" + read(0xff23, 0).toString(2).padStart(8, "0")
+    super_string += "<br><br><br></p>";
+    singledisp.innerHTML = super_string;
     old_ram.A = ram.A;
     old_ram.B = ram.B;
     old_ram.C = ram.C;
@@ -4406,7 +4689,7 @@ function cpu_cycle(single) {
             var arg1 = read(pos + 1, 0);
             var arg2 = read(pos + 2, 0);
         }
-        let instr = read(pos, 0);
+        let instr = get_byte(true);
         if (cpu_dump_intstr === 1) {
             console.log(pos.toString(16) + ": " + instr.toString(16));
         }
@@ -4451,6 +4734,37 @@ function cpu_cycle(single) {
 function run_handler() {
     timing_handler();
 }
+
+function check_registers() {
+    if (ram.A === undefined) {
+        alert("ram.A is undefined");
+        cpu_abort = true;
+    }
+    if (ram.B === undefined) {
+        alert("ram.B is undefined");
+        cpu_abort = true;
+    }
+    if (ram.C === undefined) {
+        alert("ram.C is undefined");
+        cpu_abort = true;
+    }
+    if (ram.D === undefined) {
+        alert("ram.D is undefined");
+        cpu_abort = true;
+    }
+    if (ram.E === undefined) {
+        alert("ram.E is undefined");
+        cpu_abort = true;
+    }
+    if (ram.H === undefined) {
+        alert("ram.H is undefined");
+        cpu_abort = true;
+    }
+    if (ram.L === undefined) {
+        alert("ram.L is undefined");
+        cpu_abort = true;
+    }
+};
 
 function timing_handler(cyc_run) {
     if (!stopped) {
@@ -4514,6 +4828,8 @@ function timing_handler(cyc_run) {
                     endLoop();
                     return;
                 }
+                nop_counter = Math.max(nop_counter-1, 0);
+                check_registers();
             }
             cycles -= 70224;
             sound_timer -= 70224;
