@@ -51,6 +51,9 @@ let interrupts = true;
 let stopped = false;
 let halt = false; //We can ignore Halt
 let pos = 0x100; //PC
+if (run_boot_rom) {
+    pos = 0x00;
+}
 let cycles = 0;
 let sound_timer = 8183.59375;
 let frames = 0;
@@ -4164,49 +4167,51 @@ let instruct_array = [
 
 function prepare_cpu(rom) {
     setup(rom);
-    ram.A = 1;
-    ram.Flag.Z = true;
-    ram.Flag.N = false;
-    ram.Flag.H = true;
-    ram.Flag.C = true;
-    ram.C = 0x13;
-    ram.B = 0;
-    ram.E = 0xd8;
-    ram.D = 0;
-    ram.L = 0x4d;
-    ram.H = 1;
-    ram.SP = [0xff, 0xfe];
-    //write(0xFF05, 0, 0);
-    //write(0xFF06, 0, 0);
-    //write(0xFF07, 0, 0);
-    write(0xff10, 0x80, 0);
-    write(0xff11, 0xbf, 0);
-    write(0xff12, 0xf3, 0);
-    write(0xff14, 0xbf, 0);
-    write(0xff16, 0x3f, 0);
-    write(0xff17, 0x00, 0);
-    write(0xff19, 0xbf, 0);
-    write(0xff1a, 0x7f, 0);
-    write(0xff1b, 0xff, 0);
-    write(0xff1c, 0x9f, 0);
-    write(0xff1e, 0xbf, 0);
-    write(0xff20, 0xff, 0);
-    //write(0xFF21, 0, 0);
-    //write(0xFF22, 0, 0);
-    write(0xff23, 0xbf, 0);
-    write(0xff24, 0x77, 0);
-    write(0xff25, 0xf3, 0);
-    write(0xff26, 0xf1, 0);
-    write(0xff40, 0x91, 0);
-    //write(0xFF42, 0, 0);
-    //write(0xFF43, 0, 0);
-    //write(0xFF45, 0, 0);
-    write(0xff47, 0xfc, 0);
-    write(0xff48, 0xff, 0);
-    write(0xff49, 0xff, 0);
-    //write(0xFF4A, 0, 0);
-    //write(0xFF4B, 0, 0);
-    //write(0xFFFF, 0, 0);
+    if (!run_boot_rom) {
+        ram.A = 1;
+        ram.Flag.Z = true;
+        ram.Flag.N = false;
+        ram.Flag.H = true;
+        ram.Flag.C = true;
+        ram.C = 0x13;
+        ram.B = 0;
+        ram.E = 0xd8;
+        ram.D = 0;
+        ram.L = 0x4d;
+        ram.H = 1;
+        ram.SP = [0xff, 0xfe];
+        //write(0xFF05, 0, 0);
+        //write(0xFF06, 0, 0);
+        //write(0xFF07, 0, 0);
+        write(0xff10, 0x80, 0);
+        write(0xff11, 0xbf, 0);
+        write(0xff12, 0xf3, 0);
+        write(0xff14, 0xbf, 0);
+        write(0xff16, 0x3f, 0);
+        write(0xff17, 0x00, 0);
+        write(0xff19, 0xbf, 0);
+        write(0xff1a, 0x7f, 0);
+        write(0xff1b, 0xff, 0);
+        write(0xff1c, 0x9f, 0);
+        write(0xff1e, 0xbf, 0);
+        write(0xff20, 0xff, 0);
+        //write(0xFF21, 0, 0);
+        //write(0xFF22, 0, 0);
+        write(0xff23, 0xbf, 0);
+        write(0xff24, 0x77, 0);
+        write(0xff25, 0xf3, 0);
+        write(0xff26, 0xf1, 0);
+        write(0xff40, 0x91, 0);
+        //write(0xFF42, 0, 0);
+        //write(0xFF43, 0, 0);
+        //write(0xFF45, 0, 0);
+        write(0xff47, 0xfc, 0);
+        write(0xff48, 0xff, 0);
+        write(0xff49, 0xff, 0);
+        //write(0xFF4A, 0, 0);
+        //write(0xFF4B, 0, 0);
+        //write(0xFFFF, 0, 0);
+    }
 }
 
 function show_debug_log() {
@@ -4766,6 +4771,13 @@ function check_registers() {
     }
 };
 
+function check_cpu_pointer() {
+    if (run_boot_rom && in_boot_rom && pos > 0x100) {
+        alert("PC out of boot ROM before execution complete");
+        cpu_abort = true;
+    }
+};
+
 function timing_handler(cyc_run) {
     if (!stopped) {
         cyc_run = cyc_run || 0;
@@ -4830,6 +4842,7 @@ function timing_handler(cyc_run) {
                 }
                 nop_counter = Math.max(nop_counter-1, 0);
                 check_registers();
+                check_cpu_pointer();
             }
             cycles -= 70224;
             sound_timer -= 70224;
@@ -4933,6 +4946,15 @@ function unpack_state(unpack) {
     load_state(unpack, z);
     alert("Save State Loaded");
 }
+
+function cpu_reset() {
+    if (run_boot_rom) {
+        in_boot_rom = true;
+        pos = 0x00;
+    }else {
+        pos = 0x100;
+    }
+};
 
 /*ram.A = 0xFF;
 ram.E = 0x92;

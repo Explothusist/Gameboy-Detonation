@@ -13,8 +13,11 @@ let short_run = document.getElementById("shortrun");
 let savestate = document.getElementById("savestate");
 let loadstate = document.getElementById("loadstate");
 let statetoload = document.getElementById("statetoload");
-//let Gameram = document.getElementById("gameram");
-//let load = document.getElementById("load");
+let Gameram = document.getElementById("gameram");
+let load = document.getElementById("load");
+let saveram = document.getElementById("saveram");
+let savenewram = document.getElementById("savenewram");
+let reset = document.getElementById("reset");
 
 let state = undefined;
 let unpack = undefined;
@@ -64,9 +67,10 @@ let numbers = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"];
 Gamerom.addEventListener("change", function () {
     rom = this.files[0];
 });
-/*Gameram.addEventListener("change", function () {
+Gameram.addEventListener("change", function () {
     m_ram = this.files[0];
-});*/
+    load.innerHTML = "Load RAM";
+});
 statetoload.addEventListener("change", function () {
     state = this.files[0];
 });
@@ -94,16 +98,57 @@ engage.onclick = function () {
         rom = reader.readAsArrayBuffer(rom);
         engage.outerHTML = "<button id='engage' disabled>ROM Loaded</button>";
         Gamerom.outerHTML = "<input type='file' id='gamerom' disabled />";
-        go = /*0.5*/ 1;
+        go += 0.5;
     }
 };
 
-/*let repeat = false;
+// load.onclick = function() {
+//     // fetch("Save_RAM/"+romname+".gbram")
+//     //     .then((res) => res.text())
+//     //     .then((text) => {
+//     //         console.log(text);
+//     //     })
+//     //     .catch((e) => console.error(e));
+    
+//     // let req = new XMLHttpRequest();
+//     // req.open("GET", "Save_RAM/"+romname+".gbram", false);
+//     // req.overrideMimeType("text/plain; charset=binary-data");
+//     // req.send(null);
+//     // if (req.status !== 200) {
+//     //     console.log("error");
+//     //     return null;
+//     // }
+//     // req.responseType = "arraybuffer";
+//     // let buffer = req.response;
+//     // let resultArray = new Uint8Array(buffer);
+
+//     // console.log(resultArray);
+
+
+//     // var text = req.responseText;
+//     // var resultArray = new Uint8Array(text.length);
+//     // for(var i = 0; i < text.length;i++){
+//     // resultArray[i] = (text[i].charCodeAt() & 255) & 255;
+//     // }
+// };
+
+function load_ram_data(ram) {
+    let counter = 0;
+    for (let i = 0; i < 16; i++) {
+        for (var j = 0; j < rambanks[i].length; j++) {
+            rambanks[i][j] = ram[counter];
+            counter += 1;
+        }
+    }
+    XA000 = rambanks[rambank];
+};
+
+let repeat = false;
 
 load.onclick = function () {
     if (m_ram === undefined) {
         if (repeat) {
-            load.outerHTML = "<button id='load' disabled>RAM Loaded</button>";
+            load.outerHTML = "<button id='load' disabled>No RAM</button>";
             Gameram.outerHTML = "<input type='file' id='gameram' disabled />";
             go = 1;
         } else {
@@ -114,15 +159,24 @@ load.onclick = function () {
         const reader = new FileReader();
         reader.onload = function () {
             m_ram = new Uint8Array(this.result);
-            XA000 = m_ram;
-            rambanks[0] = m_ram;
+            load_ram_data(m_ram);
         };
         m_ram = reader.readAsArrayBuffer(m_ram);
         load.outerHTML = "<button id='load' disabled>RAM Loaded</button>";
         Gameram.outerHTML = "<input type='file' id='gameram' disabled />";
-        go = 1;
+        saveram.outerHTML = "<<button id='saveram'>Save RAM</button>";
+        go += 0.5;
     }
-};*/
+};
+
+savenewram.onclick = function() {
+    let to_save = [];
+    rambanks[pram] = XA000;
+    for (let i = 0; i < rambanks.length; i++) {
+        to_save.push(rambanks[i]);
+    }
+    saveRAM(to_save);
+};
 
 prepare.onclick = function () {
     if (go === 1) {
@@ -231,10 +285,16 @@ loadstate.onclick = function () {
             unpack = new Uint8Array(this.result);
             unpack_state(unpack);
         };
+        run_boot_rom = false;
         reader.readAsArrayBuffer(state);
     } else {
         alert("Please select a save state file to load.");
     }
+};
+
+reset.onclick = function () {
+    cpu_reset();
+    memory_reset();
 };
 
 let d = document.getElementById("display");

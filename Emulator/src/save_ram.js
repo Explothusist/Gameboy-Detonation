@@ -27,3 +27,8 @@ async function saveState(to_save) {
     [fileHandle] = await window.showOpenFilePicker();
     writeFile(fileHandle, to_save);
 }
+
+async function saveRAM(to_save) {
+    [fileHandle] = await window.showOpenFilePicker();
+    writeFile(fileHandle, to_save);
+}

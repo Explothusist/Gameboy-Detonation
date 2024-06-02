@@ -11,12 +11,16 @@
     <canvas width="160" height="144" id="display"></canvas>
 
     <button id="sound">Setup Sound</button>
+    <label for="gamerom">Game ROM File:</label>
     <input type="file" id="gamerom" />
     <button id="engage">Engage Explosives</button>
-    <!-- <input type="file" id="gameram" /> -->
-    <!-- <button id="load">Load RAM</button> -->
+    <input type="file" id="gameram" />
+    <button id="load">No RAM</button>
     <button id="prepare">Prepare Fuse</button>
     <button id="begin">Detonate!</button>
+    <button id="reset">Reset</button>
+    <button id="saveram" disabled>Save RAM</button>
+    <button id="savenewram">Save New RAM</button>
     <button id="savestate">Save State</button>
     <input type="file" id="statetoload" />
     <button id="loadstate">Load State</button>
@@ -30,7 +34,6 @@
     <button id="log_run_back">Error Log Backward</button>
 
     <div id="singledisp"></div>
-
     <script src="src/cb_functions.js"></script>
     <script src="src/memory.js"></script>
     <script src="src/save_ram.js"></script>

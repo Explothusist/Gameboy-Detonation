@@ -1,6 +1,31 @@
 const mem_dump_instr = 0;
 let mem_abort = false;
 let mem_suspicious = false;
+ 
+let boot_rom = new Uint8Array([
+    0x31, 0xFE, 0xFF, 0xAF, 0x21, 0xFF, 0x9F, 0x32, 0xCB, 0x7C, 0x20, 0xFB, 0x21, 0x26, 0xFF, 0x0E, 
+    0x11, 0x3E, 0x80, 0x32, 0xE2, 0x0C, 0x3E, 0xF3, 0xE2, 0x32, 0x3E, 0x77, 0x77, 0x3E, 0xFC, 0xE0, 
+    0x47, 0x11, 0x04, 0x01, 0x21, 0x10, 0x80, 0x1A, 0xCD, 0x95, 0x00, 0xCD, 0x96, 0x00, 0x13, 0x7B, 
+    0xFE, 0x34, 0x20, 0xF3, 0x11, 0xD8, 0x00, 0x06, 0x08, 0x1A, 0x13, 0x22, 0x23, 0x05, 0x20, 0xF9, 
+    0x3E, 0x19, 0xEA, 0x10, 0x99, 0x21, 0x2F, 0x99, 0x0E, 0x0C, 0x3D, 0x28, 0x08, 0x32, 0x0D, 0x20, 
+    0xF9, 0x2E, 0x0F, 0x18, 0xF3, 0x67, 0x3E, 0x64, 0x57, 0xE0, 0x42, 0x3E, 0x91, 0xE0, 0x40, 0x04, 
+    0x1E, 0x02, 0x0E, 0x0C, 0xF0, 0x44, 0xFE, 0x90, 0x20, 0xFA, 0x0D, 0x20, 0xF7, 0x1D, 0x20, 0xF2, 
+    0x0E, 0x13, 0x24, 0x7C, 0x1E, 0x83, 0xFE, 0x62, 0x28, 0x06, 0x1E, 0xC1, 0xFE, 0x64, 0x20, 0x06, 
+    0x7B, 0xE2, 0x0C, 0x3E, 0x87, 0xE2, 0xF0, 0x42, 0x90, 0xE0, 0x42, 0x15, 0x20, 0xD2, 0x05, 0x20, 
+    0x4F, 0x16, 0x20, 0x18, 0xCB, 0x4F, 0x06, 0x04, 0xC5, 0xCB, 0x11, 0x17, 0xC1, 0xCB, 0x11, 0x17, 
+    0x05, 0x20, 0xF5, 0x22, 0x23, 0x22, 0x23, 0xC9, 0xCE, 0xED, 0x66, 0x66, 0xCC, 0x0D, 0x00, 0x0B, 
+    0x03, 0x73, 0x00, 0x83, 0x00, 0x0C, 0x00, 0x0D, 0x00, 0x08, 0x11, 0x1F, 0x88, 0x89, 0x00, 0x0E, 
+    0xDC, 0xCC, 0x6E, 0xE6, 0xDD, 0xDD, 0xD9, 0x99, 0xBB, 0xBB, 0x67, 0x63, 0x6E, 0x0E, 0xEC, 0xCC, 
+    0xDD, 0xDC, 0x99, 0x9F, 0xBB, 0xB9, 0x33, 0x3E, 0x3C, 0x42, 0xB9, 0xA5, 0xB9, 0xA5, 0x42, 0x3C, 
+    0x21, 0x04, 0x01, 0x11, 0xA8, 0x00, 0x1A, 0x13, 0xBE, 0x20, 0xFE, 0x23, 0x7D, 0xFE, 0x34, 0x20, 
+    0xF5, 0x06, 0x19, 0x78, 0x86, 0x23, 0x05, 0x20, 0xFB, 0x86, 0x20, 0xFE, 0x3E, 0x01, 0xE0, 0x50
+]);
+
+let run_boot_rom = true;
+let in_boot_rom = false;
+if (run_boot_rom) {
+    in_boot_rom = true;
+}
 
 let XFFFF = 0;
 let XFF80 = new Uint8Array(0x7f);
@@ -46,6 +71,18 @@ let testrom = false;
 let lastff01 = 0;
 let trommess = "";
 
+function memory_reset() {
+    XFFFF = 0; // Interrupt Enable register
+    XFF80 = new Uint8Array(0x7f); // HRAM
+    XFF4C = new Uint8Array(0x34); // More I/O ish
+    XFF00 = new Uint8Array(0x4c); // I/O
+    XFE00 = new Uint8Array(0xa0); // OAM
+    XE000 = new Uint8Array(0x1e00); // ECHO
+    XC000 = new Uint8Array(0x2000); // WRAM
+    // XA000 = new Uint8Array(0x2000); // Cartridge RAM
+    X8000 = new Uint8Array(0x2000); // Video RAM
+};
+
 function setup(rom) {
     car_type = rom[0x147];
     let rom_size = rom[0x148];
@@ -69,6 +106,7 @@ function setup(rom) {
                 X4000[i] = rom[i + offset];
             }
             offset += 0x4000;
+            console.log("2 bank ROM");
             break;
         case 1:
             //4 bank
@@ -89,6 +127,7 @@ function setup(rom) {
             }
             offset += 0x4000;
             X4000 = rombanks[1];
+            console.log("4 bank ROM");
             break;
         case 2:
             //8 bank
@@ -124,6 +163,7 @@ function setup(rom) {
             }
             offset += 0x4000;
             X4000 = rombanks[1];
+            console.log("8 bank ROM");
             break;
         case 3:
             //16 bank
@@ -138,6 +178,7 @@ function setup(rom) {
                 offset += 0x4000;
             }
             X4000 = rombanks[1];
+            console.log("16 bank ROM");
             break;
         case 4:
             //32 bank
@@ -152,6 +193,7 @@ function setup(rom) {
                 offset += 0x4000;
             }
             X4000 = rombanks[1];
+            console.log("32 bank ROM");
             break;
         case 5:
             //64 bank
@@ -166,6 +208,7 @@ function setup(rom) {
                 offset += 0x4000;
             }
             X4000 = rombanks[1];
+            console.log("64 bank ROM");
             break;
         case 6:
             //128 bank
@@ -180,6 +223,7 @@ function setup(rom) {
                 offset += 0x4000;
             }
             X4000 = rombanks[1];
+            console.log("128 bank ROM");
             break;
         case 0x52:
             //72 bank
@@ -194,6 +238,7 @@ function setup(rom) {
                 offset += 0x4000;
             }
             X4000 = rombanks[1];
+            console.log("72 bank ROM");
             break;
         case 0x53:
             //80 bank
@@ -208,6 +253,7 @@ function setup(rom) {
                 offset += 0x4000;
             }
             X4000 = rombanks[1];
+            console.log("80 bank ROM");
             break;
         case 0x54:
             //96 bank
@@ -222,125 +268,152 @@ function setup(rom) {
                 offset += 0x4000;
             }
             X4000 = rombanks[1];
+            console.log("96 bank ROM");
             break;
         default:
             alert("ERROR: invalid ROM size");
     }
-    /*switch (ram_size) {
+    switch (ram_size) {
         case 0:
             //None
+            console.log("No RAM");
             break;
         case 1:
             //1 bank
+            console.log("1 bank RAM");
             break;
         case 2:
             //1 bank
+            console.log("1 bank RAM");
             break;
         case 3:
             //4 bank
+            console.log("4 bank RAM");
             break;
         case 4:
             //16 bank
+            console.log("16 bank RAM");
             break;
         default:
             alert("ERROR: invalid RAM size");
-    }*/
+    }
     switch (car_type) {
         case 0:
             //ROM Only
             car_type = 0;
+            console.log("ROM Only");
             break;
         case 1:
             //ROM+MBC1
             car_type = 1;
+            console.log("ROM + MBC1");
             break;
         case 2:
             //ROM+MBC1+RAM
             car_type = 1;
+            console.log("ROM + MBC1 + RAM");
             break;
         case 3:
             //ROM+MBC1+RAM+BATT
             car_type = 1;
             batt = 1;
+            console.log("ROM + MBC1 + RAM + BATT");
             break;
         case 5:
             //ROM+MBC2
             car_type = 2;
+            console.log("ROM + MBC2");
             break;
         case 6:
             //ROM+MBC2+BATT
             car_type = 2;
             batt = 1;
+            console.log("ROM + MBC2 + BATT");
             break;
         case 8:
             //ROM+RAM
             car_type = 0;
+            console.log("ROM + RAM");
             break;
         case 9:
             //ROM+RAM+BATT
             car_type = 0;
             batt = 1;
+            console.log("ROM + RAM + BATT");
             break;
         case 0xb:
             //ROM+MMMO1
             car_type = 2;
+            console.log("ROM + MMM01");
             break;
         case 0xc:
             //ROM+MMMO1+SRAM
             car_type = 2;
             sram = 1;
+            console.log("ROM + MMM01 + SRAM");
             break;
         case 0xd:
             //ROM+MMMO1+SRAM+BATT
             car_type = 2;
             sram = 1;
             batt = 1;
+            console.log("ROM + MMM01 + SRAM + BATT");
             break;
         case 0xf:
-            //ROM+MCB3+TIMER+BATT
+            //ROM+MBC3+TIMER+BATT
             car_type = 3;
             batt = 1;
+            console.log("ROM + MBC3 + TIMER + BATT");
             break;
         case 0x10:
-            //ROM+MCB3+TIMER+RAM+BATT
+            //ROM+MBC3+TIMER+RAM+BATT
             car_type = 3;
             batt = 1;
+            console.log("ROM + MBC3 + TIMER + RAM + BATT");
             break;
         case 0x11:
-            //ROM+MCB3
+            //ROM+MBC3
             car_type = 3;
+            console.log("ROM + MBC3");
             break;
         case 0x12:
             //ROM+MCB3+RAM
             car_type = 3;
+            console.log("ROM + MBC3 + RAM");
             break;
         case 0x13:
             //ROM+MCB3+RAM+BATT
             car_type = 3;
             batt = 1;
+            console.log("ROM + MBC3 + RAM + BATT");
             break;
         case 0x19:
             //ROM+MCB5
             car_type = 5;
+            console.log("ROM + MBC5");
             break;
         case 0x1a:
             //ROM+MCB5+RAM
             car_type = 5;
+            console.log("ROM + MBC5 + RAM");
             break;
         case 0x1b:
             //ROM+MCB5+RAM+BATT
+            console.log("ROM + MBC5 + RAM + BATT");
             car_type = 5;
             break;
         case 0x1c:
             //ROM+MCB5+RUMBLE
             car_type = 5;
             rumble = 1;
+            console.log("ROM + MBC5 + RUMBLE");
             break;
         case 0x1d:
             //ROM+MCB5+RUMBLE+SRAM
             car_type = 5;
             rumble = 1;
             sram = 1;
+            console.log("ROM + MBC5 + RUMBLE + SRAM");
             break;
         case 0x1e:
             //ROM+MCB5+RUMBLE+SRAM+BATT
@@ -348,6 +421,7 @@ function setup(rom) {
             rumble = 1;
             sram = 1;
             batt = 1;
+            console.log("ROM + MBC5 + RUMBLE + SRAM + BATT");
             break;
         case 0x1f:
             //Pocket Camera
@@ -377,6 +451,10 @@ function setup(rom) {
 function read(pos, message = 1) {
     let dump = mem_dump_instr * message;
     if (pos < 0x4000) {
+        // Boot ROM
+        if (pos < 0x100 && in_boot_rom && run_boot_rom) {
+            return boot_rom[pos];
+        }
         //ROM bank 0
         if (dump === 1) {
             console.log("ROM bank 0 read");
@@ -799,6 +877,10 @@ function write(pos, val, message = 1) {
             }
             return;
         } else if (pos < 0xff80) {
+            // Used once (Boot ROM)
+            if (pos === 0xff50 && in_boot_rom && run_boot_rom) {
+                in_boot_rom = false;
+            }
             //Empty (+ I/O ports?)
             if (dump === 1) {
                 console.log(" ?? CAUTION ?? Probably I/O ports extension written");

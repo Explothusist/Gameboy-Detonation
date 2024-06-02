@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title id="top">Detonation Emulation</title>
+    <meta charset="UTF-8" />
+    <style>
+      button {
+        color: #421706;
+        background-color: rgb(136, 136, 136);
+        padding: 10px 15px;
+        text-align: center;
+        text-decoration: none;
+        display: inline-block;
+        font-size: 16px;
+        margin: 4px 2px;
+        cursor: pointer;
+        font-weight: bold;
+      }
+
+      .collapser {
+        background-color: #eee;
+        color: #444;
+        cursor: pointer;
+        padding: 18px;
+        margin-bottom: 0px;
+        width: 100%;
+        border: none;
+        text-align: left;
+        outline: none;
+        font-size: 20px;
+      }
+      .active, .collapser:hover {
+        background-color: #ccc;
+      }
+
+      .collapsed {
+        margin: 2px;
+        padding: 10px;
+        font-size: 20px;
+        margin-top: 0px;
+        display: none;
+        overflow: hidden;
+        background-color: #f1f1f1;
+      }
+      #emulation {
+        display: block;
+      }
+      label {
+        margin: 10px;
+        font-size: 20px;
+      }
+
+      /* #display {
+        image-rendering: -webkit-optimize-contrast;
+        image-rendering: optimize-contrast;
+      } */
+    </style>
+  </head>
+
+  <body>
+    <div id="app">LOADING... please wait.</div>
+
+    <canvas width="160" height="144" id="display"></canvas>
+
+    <div id="sound_setup">
+      <button id="sound">Setup Sound</button>
+    </div>
+
+    <button type="button" class="collapser">Emulation</button>
+    <div class="collapsed" id="emulation">
+      <label for="gamerom">Game ROM File:</label>
+      <input type="file" id="gamerom" />
+      <button id="engage">Engage Explosives</button>
+      <input type="file" id="gameram" />
+      <button id="load">No RAM</button>
+      <button id="prepare">Prepare Fuse</button>
+      <button id="begin">Detonate!</button>
+      <button id="reset">Reset</button>
+      <button id="saveram" disabled>Save RAM</button>
+      <button id="savenewram">Save New RAM</button>
+    </div>
+
+    <button type="button" class="collapser">Emulator State</button>
+    <div class="collapsed"  id="state_manip">
+      <button id="savestate">Save State</button>
+      <input type="file" id="statetoload" />
+      <button id="loadstate">Load State</button>
+    </div>
+
+    <button type="button" class="collapser">Debug</button>
+    <div class="collapsed"  id="debug">
+      <input type="checkbox" id="dump" />
+      <label>Dump Instructions</label>
+    </div>
+
+    <button type="button" class="collapser">Debug Run</button>
+    <div class="collapsed"  id="debug_run">
+      <button id="step">Single Step</button>
+      <input type="number" id="val" />
+      <button id="shortrun">Run for Cycles</button>
+    </div>
+
+    <button type="button" class="collapser">Debug Log</button>
+    <div class="collapsed"  id="debug_log">
+      <input type="number" id="log_pos" value="1" max="50" min="1" />
+      <button id="log_run">Error Log</button>
+      <button id="log_run_back">Error Log Backward</button>
+    </div>
+
+    <div id="singledisp"></div>
+    
+    <script src="interactive.js"></script>
+
+    <script src="src/cb_functions.js"></script>
+    <script src="src/memory.js"></script>
+    <script src="src/save_ram.js"></script>
+    <script src="src/screen.js"></script>
+    <script src="src/snd_module.js"></script>
+    <!-- <script src="src/sound.js"></script> -->
+    <script src="src/cpu_functions.js"></script>
+    <script src="src/main.js"></script>
+    <script src="splash_screen/draw_splash.js"></script>
+  </body>
+</html>
