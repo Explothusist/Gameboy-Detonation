@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title id="top">Detonation Emulation</title>
+    <meta charset="UTF-8" />
+  </head>
+
+  <body>
+    <div id="app">LOADING... please wait.</div>
+
+    <canvas width="160" height="144" id="display"></canvas>
+
+    <button id="sound">Setup Sound</button>
+
+    <label for="data_dir">Emulator Data Directory</label>
+    <input type="file" id="data_dir" webkitdirectory></input>
+
+    <!-- <label for="gamerom">Game ROM File:</label> -->
+    <!-- <input type="file" id="gamerom" /> -->
+    <!-- <button id="engage">Engage Explosives</button> -->
+    <!-- <input type="file" id="gameram" /> -->
+    <!-- <button id="load">No RAM</button> -->
+    <!-- <button id="prepare">Prepare Fuse</button> -->
+    <button id="begin">Detonate!</button>
+    <button id="reset">Reset</button>
+    <!-- <button id="saveram" disabled>Save RAM</button> -->
+    <!-- <button id="savenewram">Save New RAM</button> -->
+    <!-- <button id="savestate">Save State</button> -->
+    <!-- <input type="file" id="statetoload" /> -->
+    <!-- <button id="loadstate">Load State</button> -->
+    <input type="checkbox" id="dump" />
+    <!-- <label>Dump Instructions</label> -->
+    <!-- <button id="step">Single Step</button> -->
+    <!-- <input type="number" id="val" /> -->
+    <!-- <button id="shortrun">Run for Cycles</button> -->
+    <input type="number" id="log_pos" value="1" max="50" min="1" />
+    <button id="log_run">Error Log</button>
+    <button id="log_run_back">Error Log Backward</button>
+
+    <div id="singledisp"></div>
+    <script src="src/cb_functions.js"></script>
+    <script src="src/memory.js"></script>
+    <script src="src/save_ram.js"></script>
+    <script src="src/screen.js"></script>
+    <script src="src/snd_module.js"></script>
+    <!-- <script src="src/sound.js"></script> -->
+    <script src="src/cpu_functions.js"></script>
+    <script src="src/gui_main.js"></script>
+  </body>
+</html>
