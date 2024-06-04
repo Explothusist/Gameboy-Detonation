@@ -58,6 +58,8 @@ let cycles = 0;
 let sound_timer = 8183.59375;
 let frames = 0;
 
+let keybindings = ["LeftArrow", "DownArrow", "RightArrow", "UpArrow", "Z", "X", "Enter", "Shift"];
+
 //01-special:
 //  Passed
 
@@ -4306,50 +4308,51 @@ function check_sus() {
     }
 }
 
+
 document.addEventListener("keydown", function (event) {
-    if (event.key === "ArrowLeft") {
+    if (event.key === keybindings[0]) {
         //left
         event.preventDefault();
         keyl = 1;
         key_change = true;
         stopped = false;
-    } else if (event.key === "ArrowDown") {
+    } else if (event.key === keybindings[1]) {
         //down
         event.preventDefault();
         keyd = 1;
         key_change = true;
         stopped = false;
-    } else if (event.key === "ArrowRight") {
+    } else if (event.key === keybindings[2]) {
         //right
         event.preventDefault();
         keyr = 1;
         key_change = true;
         stopped = false;
-    } else if (event.key === "ArrowUp") {
+    } else if (event.key === keybindings[3]) {
         //up
         event.preventDefault();
         keyu = 1;
         key_change = true;
         stopped = false;
-    } else if (event.key === "z") {
+    } else if (event.key === keybindings[4]) {
         //B
         event.preventDefault();
         keyb = 1;
         key_change = true;
         stopped = false;
-    } else if (event.key === "x") {
+    } else if (event.key === keybindings[5]) {
         //A
         event.preventDefault();
         keya = 1;
         key_change = true;
         stopped = false;
-    } else if (event.key === "Enter") {
+    } else if (event.key === keybindings[6]) {
         //Start
         event.preventDefault();
         keyst = 1;
         key_change = true;
         stopped = false;
-    } else if (event.key === "Shift") {
+    } else if (event.key === keybindings[7]) {
         //Select
         event.preventDefault();
         keyse = 1;
@@ -4358,7 +4361,7 @@ document.addEventListener("keydown", function (event) {
     }
 });
 document.addEventListener("keyup", function (event) {
-    if (event.key === "ArrowLeft") {
+    if (event.key === keybindings[0]) {
         //left
         event.preventDefault();
         keyl = 0;
@@ -4366,7 +4369,7 @@ document.addEventListener("keyup", function (event) {
         if (p14 === 1) {
             throw_pchange = 1;
         }
-    } else if (event.key === "ArrowDown") {
+    } else if (event.key === keybindings[1]) {
         //down
         event.preventDefault();
         keyd = 0;
@@ -4374,7 +4377,7 @@ document.addEventListener("keyup", function (event) {
         if (p14 === 1) {
             throw_pchange = 1;
         }
-    } else if (event.key === "ArrowRight") {
+    } else if (event.key === keybindings[2]) {
         //right
         event.preventDefault();
         keyr = 0;
@@ -4382,7 +4385,7 @@ document.addEventListener("keyup", function (event) {
         if (p14 === 1) {
             throw_pchange = 1;
         }
-    } else if (event.key === "ArrowUp") {
+    } else if (event.key === keybindings[3]) {
         //up
         event.preventDefault();
         keyu = 0;
@@ -4390,7 +4393,7 @@ document.addEventListener("keyup", function (event) {
         if (p14 === 1) {
             throw_pchange = 1;
         }
-    } else if (event.key === "z") {
+    } else if (event.key === keybindings[4]) {
         //B
         event.preventDefault();
         keyb = 0;
@@ -4398,7 +4401,7 @@ document.addEventListener("keyup", function (event) {
         if (p15 === 1) {
             throw_pchange = 1;
         }
-    } else if (event.key === "x") {
+    } else if (event.key === keybindings[5]) {
         //A
         event.preventDefault();
         keya = 0;
@@ -4406,7 +4409,7 @@ document.addEventListener("keyup", function (event) {
         if (p15 === 1) {
             throw_pchange = 1;
         }
-    } else if (event.key === "Enter") {
+    } else if (event.key === keybindings[6]) {
         //Start
         event.preventDefault();
         keyst = 0;
@@ -4414,7 +4417,7 @@ document.addEventListener("keyup", function (event) {
         if (p15 === 1) {
             throw_pchange = 1;
         }
-    } else if (event.key === "Shift") {
+    } else if (event.key === keybindings[7]) {
         //Select
         event.preventDefault();
         keyse = 0;

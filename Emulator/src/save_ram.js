@@ -23,12 +23,46 @@ async function writeFile(fileHandle, contents) {
     await writable.close();
 }
 
-async function saveState(to_save) {
+async function saveThing(to_save) {
     [fileHandle] = await window.showOpenFilePicker();
     writeFile(fileHandle, to_save);
+    onSaveEnd();
+}
+
+async function saveState(to_save) {
+    saveThing(to_save);
 }
 
 async function saveRAM(to_save) {
-    [fileHandle] = await window.showOpenFilePicker();
-    writeFile(fileHandle, to_save);
+    saveThing(to_save);
 }
+
+async function saveROM(to_save) {
+    saveThing(to_save);
+}
+
+async function saveText(to_save) {
+    saveThing(to_save);
+}
+async function onSaveEnd() {
+
+};
+
+async function getFileHandle() {
+    let handle;
+    [handle] = await window.showOpenFilePicker();
+    onFileHandleLoad(handle);
+};
+async function onFileHandleLoad(handle) {
+
+};
+
+let file;
+async function getROM() {
+    [fileHandle] = await window.showOpenFilePicker();
+    let file = await fileHandle.getFile();
+    onROMload(file);
+};
+async function onROMload(file) {
+
+};

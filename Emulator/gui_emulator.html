@@ -10,10 +10,12 @@
 
     <canvas width="160" height="144" id="display"></canvas>
 
-    <button id="sound">Setup Sound</button>
+    <div>
+      <button id="sound">Setup Sound</button>
 
-    <label for="data_dir">Emulator Data Directory</label>
-    <input type="file" id="data_dir" webkitdirectory></input>
+      <label for="data_dir">Emulator Data Directory</label>
+      <input type="file" id="data_dir" webkitdirectory></input>
+    </div>
 
     <!-- <label for="gamerom">Game ROM File:</label> -->
     <!-- <input type="file" id="gamerom" /> -->
@@ -21,13 +23,16 @@
     <!-- <input type="file" id="gameram" /> -->
     <!-- <button id="load">No RAM</button> -->
     <!-- <button id="prepare">Prepare Fuse</button> -->
-    <button id="begin">Detonate!</button>
-    <button id="reset">Reset</button>
-    <!-- <button id="saveram" disabled>Save RAM</button> -->
+    <div>
+      <button id="begin">Detonate!</button>
+      <button id="reset">Reset</button>
+      <button id="saveram">Save RAM</button>
+    </div>
     <!-- <button id="savenewram">Save New RAM</button> -->
     <!-- <button id="savestate">Save State</button> -->
     <!-- <input type="file" id="statetoload" /> -->
     <!-- <button id="loadstate">Load State</button> -->
+    <div>
     <input type="checkbox" id="dump" />
     <!-- <label>Dump Instructions</label> -->
     <!-- <button id="step">Single Step</button> -->
@@ -36,6 +41,7 @@
     <input type="number" id="log_pos" value="1" max="50" min="1" />
     <button id="log_run">Error Log</button>
     <button id="log_run_back">Error Log Backward</button>
+    </div>
 
     <div id="singledisp"></div>
     <script src="src/cb_functions.js"></script>
@@ -44,6 +50,7 @@
     <script src="src/screen.js"></script>
     <script src="src/snd_module.js"></script>
     <!-- <script src="src/sound.js"></script> -->
+    <script src="src/joysitck.js"></script>
     <script src="src/cpu_functions.js"></script>
     <script src="src/gui_main.js"></script>
   </body>

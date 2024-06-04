@@ -1,0 +1,12 @@
+ArrowLeft
+ArrowDown
+ArrowRight
+ArrowUp
+z
+x
+Enter
+Shift
+
+
+
+
