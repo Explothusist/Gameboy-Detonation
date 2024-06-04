@@ -380,7 +380,7 @@ start_game = function() {
         begin.innerHTML = "Pause";
         beginLoop();
 
-        save_loop = setInterval(save_current_RAM, 2000);
+        save_loop = setInterval(save_current_RAM, 5000);
     }
 };
 select_rom = function() {
@@ -497,7 +497,7 @@ begin.onclick = function () {
             go = 3;
             begin.innerHTML = "Pause";
             beginLoop();
-            save_loop = setInterval(save_current_RAM, 2000);
+            save_loop = setInterval(save_current_RAM, 5000);
         } else if (go === 3) {
             go = 2;
             begin.innerHTML = "Resume";
@@ -539,15 +539,36 @@ document.addEventListener("keyup", function (event) {
 });
 
 function maintain_control() {
-    m_menu.draw_self();
     let events = get_gamepad_events();
+    for (let event of events) {
+        if (event.new_state === false) {
+            let keybind = "J"+event.button.padStart(2, "0");
+            if (!m_menu.next_key_grabbed) {
+                let key = "";
+                console.log(keybind);
+                if (keybind === keybindings[3] || keybind === "J12") {
+                    key = "ArrowUp";
+                }else if (keybind === keybindings[1] || keybind === "J13") {
+                    key = "ArrowDown";
+                }else if (keybind === keybindings[6] || keybind === "J01") {
+                    key = "Enter";
+                }
+                if (key !== "") {
+                    m_menu.key_handle(key);
+                }
+            }else {
+                m_menu.key_handle(keybind);
+            }
+        }
+    }
+    m_menu.draw_self();
 };
 
 let gui_loop = undefined;
 function seize_control() {
     gui_has_control = true;
     setup_need_directory();
-    gui_loop = setInterval(maintain_control, 50);
+    gui_loop = setInterval(maintain_control, 30);
 };
 
 relinquish_control = function() {

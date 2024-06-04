@@ -1,11 +1,12 @@
-ArrowLeft
-ArrowDown
-ArrowRight
-ArrowUp
-z
-x
-Enter
-Shift
+J14
+J13
+J15
+J12
+J00
+J01
+J09
+J08
+
 
 
 

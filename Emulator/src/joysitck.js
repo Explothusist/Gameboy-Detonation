@@ -7,13 +7,17 @@ function gamepadHandler(event, connected) {
   // Note:
   // gamepad === navigator.getGamepads()[gamepad.index]
 
+
   if (connected) {
+    console.log("Joystick Connected!");
     gamepads.push(new_gamepad);
     old_gamepad_states.push([]);
     for (let i in new_gamepad.buttons) {
         old_gamepad_states.at(-1).push(false);
     }
+    console.log(gamepads);
   } else {
+    console.log("Joystick Disconnected");
     for (let i in gamepads) {
         let gamepad = gamepads[i];
         if (gamepad.index === new_gamepad.index) {
@@ -47,7 +51,7 @@ function gamepad_listen() {
 function get_gamepad_events() {
     let events = [];
     for (let i in gamepads) {
-        let gamepad = gamepads[i];
+        let gamepad = navigator.getGamepads()[gamepads[i].index];
         for (let j in gamepad.buttons) {
             if (gamepad.buttons[j].pressed !== old_gamepad_states[i][j]) {
                 old_gamepad_states[i][j] = gamepad.buttons[j].pressed;

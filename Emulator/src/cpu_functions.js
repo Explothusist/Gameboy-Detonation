@@ -4428,6 +4428,121 @@ document.addEventListener("keyup", function (event) {
     }
 });
 
+function gamepad_down(button_id) {
+	let key = "J"+button_id.padStart(2, "0");
+    if (key === keybindings[0]) {
+        //left
+        keyl = 1;
+        key_change = true;
+        stopped = false;
+    } else if (key === keybindings[1]) {
+        //down
+        keyd = 1;
+        key_change = true;
+        stopped = false;
+    } else if (key === keybindings[2]) {
+        //right
+        keyr = 1;
+        key_change = true;
+        stopped = false;
+    } else if (key === keybindings[3]) {
+        //up
+        keyu = 1;
+        key_change = true;
+        stopped = false;
+    } else if (key === keybindings[4]) {
+        //B
+        keyb = 1;
+        key_change = true;
+        stopped = false;
+    } else if (key === keybindings[5]) {
+        //A
+        keya = 1;
+        key_change = true;
+        stopped = false;
+    } else if (key === keybindings[6]) {
+        //Start
+        keyst = 1;
+        key_change = true;
+        stopped = false;
+    } else if (key === keybindings[7]) {
+        //Select
+        keyse = 1;
+        key_change = true;
+        stopped = false;
+    }
+};
+function gamepad_up(button_id) {
+	let key = "J"+button_id.padStart(2, "0");
+    if (key === keybindings[0]) {
+        //left
+        keyl = 0;
+        key_change = true;
+        if (p14 === 1) {
+            throw_pchange = 1;
+        }
+    } else if (key === keybindings[1]) {
+        //down
+        keyd = 0;
+        key_change = true;
+        if (p14 === 1) {
+            throw_pchange = 1;
+        }
+    } else if (key === keybindings[2]) {
+        //right
+        keyr = 0;
+        key_change = true;
+        if (p14 === 1) {
+            throw_pchange = 1;
+        }
+    } else if (key === keybindings[3]) {
+        //up
+        keyu = 0;
+        key_change = true;
+        if (p14 === 1) {
+            throw_pchange = 1;
+        }
+    } else if (key === keybindings[4]) {
+        //B
+        keyb = 0;
+        key_change = true;
+        if (p15 === 1) {
+            throw_pchange = 1;
+        }
+    } else if (key === keybindings[5]) {
+        //A
+        keya = 0;
+        key_change = true;
+        if (p15 === 1) {
+            throw_pchange = 1;
+        }
+    } else if (key === keybindings[6]) {
+        //Start
+        keyst = 0;
+        key_change = true;
+        if (p15 === 1) {
+            throw_pchange = 1;
+        }
+    } else if (key === keybindings[7]) {
+        //Select
+        keyse = 0;
+        key_change = true;
+        if (p15 === 1) {
+            throw_pchange = 1;
+        }
+    }
+};
+function poll_joysticks() {
+	let events = get_gamepad_events();
+	for (let ev of events) {
+		if (ev.new_state === true) {
+			gamepad_down(ev.button);
+		}else {
+			gamepad_up(ev.button);
+		}
+	}
+};
+
 function spc_reg(cyc) {
     //0xFF00 I/O Ports
     let xff00 = read(0xff00, 0);
@@ -4850,6 +4965,7 @@ function timing_handler(cyc_run) {
             cycles -= 70224;
             sound_timer -= 70224;
             frames += 1;
+            poll_joysticks();
             /*if (!quit) {
                 setTimeout(timing_handler);
             }*/
