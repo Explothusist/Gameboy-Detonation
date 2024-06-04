@@ -66,3 +66,76 @@ async function getROM() {
 async function onROMload(file) {
 
 };
+
+
+
+async function getDirectoryFileHandle() {
+    let handle;
+    handle = await window.showDirectoryPicker();
+    await handle.requestPermission({ mode: "readwrite" });
+    onDirectoryFileHandleLoad(handle);
+};
+async function onDirectoryFileHandleLoad(handle) {
+
+};
+
+async function getFileHandleFromDirectoryHandle(directoryHandle, directory, filename) {
+    let SubDirectory = await directoryHandle.getDirectoryHandle(directory);
+    let fileHandle = await SubDirectory.getFileHandle(filename);
+    onFileFromDirLoad(fileHandle);
+};
+async function onFileFromDirLoad(fileHandle) {
+
+};
+
+async function* getFilesRecursively(entry) {
+    if (entry.kind === "file") {
+        const file = await entry.getFile();
+        if (file !== null) {
+            //file.relativePath = getRelativePath(entry);
+            yield file;
+        }
+    } else if (entry.kind === "directory") {
+        for await (const handle of entry.values()) {
+            yield* getFilesRecursively(handle);
+        }
+    }
+}
+async function getAllFileHandle(directoryHandle) {
+    let fileHandles = [];
+    for await (const fileHandle of getFilesRecursively(directoryHandle)) {
+        console.log(fileHandle);
+        fileHandles.push(fileHandle);
+    }
+    onAllFileHandleLoad(fileHandles);
+};
+async function onAllFileHandleLoad(fileHandles) {
+
+};
+
+async function FileHandlesToFiles(fileHandles) {
+    let files = [];
+    for (let fileHandle of fileHandles) {
+        files.push(await fileHandle.getFile());
+    }
+    onFileHandlesToFilesLoad(files);
+};
+async function onFileHandlesToFilesLoad(files) {
+
+};
+
+async function saveToFileInDirectory(directoryHandle, directory, filename, contents) {
+    let SubDirectory = await directoryHandle.getDirectoryHandle(directory);
+    let fileHandle = await SubDirectory.getFileHandle(filename);
+    await writeFile(fileHandle, contents);
+    saveInDirectoryComplete();
+};
+async function createFileInDirectory(directoryHandle, directory, filename, contents) {
+    let SubDirectory = await directoryHandle.getDirectoryHandle(directory);
+    let fileHandle = await SubDirectory.getFileHandle(filename, { create: true });
+    await writeFile(fileHandle, contents);
+    saveInDirectoryComplete();
+};
+async function saveInDirectoryComplete() {
+
+};

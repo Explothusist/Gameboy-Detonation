@@ -99,7 +99,9 @@ function setup_keybindings() {};
 function setup_edit_game() {};
 function setup_select_game() {};
 // Actions
-// function open_directory() {};
+function open_directory() {};
+function get_all_files() {};
+function get_all_files_pt2() {};
 function read_directory() {};
 function load_game() {};
 function load_game_pt2() {};
@@ -124,6 +126,7 @@ let data_dir_source = document.getElementById("data_dir");
 let gui_has_control = false;
 let save_loop;
 
+let data_dir_fileHandles = [];
 let data_dir_files = [];
 let registered_games = [];
 //{name: "Zelda - Link's Awakening", rom_path: "Legend of Zelda, The - Link's Awakening (USA, Europe).gb", ram_path: "ZELDA.gbram", save_state: ["ZELDA_1.gbstate", "ZELDA_2.gbstate", "ZELDA_3.gbstate", "ZELDA_4.gbstate"]}
@@ -173,21 +176,23 @@ let new_game = {};
 
 let RAMFileHandle;
 
+let DirectoryHandle;
+
 // data_dir_source.addEventListener("change", function () {
 //     data_dir_files = this.files;
 //     setup_main_menu();
 // });
-data_dir_source.addEventListener(
-    "change",
-    (event) => {
-        for (const file of event.target.files) {
-            data_dir_files.push(file);
-        }
-        read_directory();
-        setup_main_menu();
-    },
-    false,
-);
+// data_dir_source.addEventListener(
+//     "change",
+//     (event) => {
+//         for (const file of event.target.files) {
+//             data_dir_files.push(file);
+//         }
+//         read_directory();
+//         setup_main_menu();
+//     },
+//     false,
+// );
 
 function get_file(filename) {
     for (let file of data_dir_files) {
@@ -201,7 +206,7 @@ function get_file(filename) {
 
 
 setup_need_directory = function() {
-    m_menu = new Menu("Welcome! Please select the emulator\n    data directory.", [/*"Select Directory"*/], [/*open_directory*/], [/*{none:true}*/]);
+    m_menu = new Menu("Welcome! Please select the emulator\n    data directory.", ["Select Directory"], [open_directory], [{none:true}]);
 };
 setup_main_menu = function() {
     m_menu = new Menu("Welcome! Select an action.", ["Load Game", "Register New ROM", "Edit Existing Game", "Forget All Games", "Keybindings"], 
@@ -258,38 +263,58 @@ setup_keybindings = function(selected=0) {
     m_menu.selected = selected;
 };
 
-// open_directory = function() {
-
+open_directory = function() {
+    onDirectoryFileHandleLoad = function(handle) {
+        DirectoryHandle = handle;
+        get_all_files();
+    };
+    getDirectoryFileHandle();
+};
+get_all_files = function() {
+    onAllFileHandleLoad = function(fileHandles) {
+        data_dir_files = fileHandles;
+        get_all_files_pt2();
+        read_directory();
+        setup_main_menu();
+    };
+    getAllFileHandle(DirectoryHandle);
+};
+// get_all_files_pt2 = function() {
+//     onFileHandlesToFilesLoad = function(files) {
+//         data_dir_files = files;
+//         read_directory();
+//         setup_main_menu();
+//         console.log(data_dir_files);
+//     };
+//     FileHandlesToFiles(data_dir_fileHandles);
 // };
 read_directory = function() {
     let reg_games_file = get_file("registered_games.txt");
     if (reg_games_file === "no such file") {
-
+        saveInDirectoryComplete = function() {};
+        createFileInDirectory(DirectoryHandle, "Emulator Settings", "registered_games.txt", "");
     }else {
         let reg_games_reader = new FileReader();
         reg_games_reader.onload = function () {
-            console.log(this.result);
             let games = this.result.split("\n");
             for (let i = 0; i < games.length; i++) {
                 registered_games.push(JSON.parse(games[i]));
             }
-            console.log(registered_games);
         };
         reg_games_reader.readAsText(reg_games_file);
     }
     let keybind_file = get_file("keybindings.txt");
     if (keybind_file === "no such file") {
-
+        saveInDirectoryComplete = function() {};
+        createFileInDirectory(DirectoryHandle, "Emulator Settings", "keybindings.txt", "");
     }else {
         let keybind_reader = new FileReader();
         keybind_reader.onload = function () {
-            console.log(this.result);
             let keys = this.result.split("\n");
             for (let i = 0; i < keys.length; i++) {
                 keybindings[i] = keys[i];
                 temp_keybind[i] = keys[i];
             }
-            console.log(keybindings);
         };
         keybind_reader.readAsText(keybind_file);
     }
@@ -339,13 +364,19 @@ function save_current_RAM() {
     writeFile(RAMFileHandle, to_save);
 };
 load_game = function(args) {
-    alert("Select "+registered_games[args.game_id].ram_path+" in /Emulator Data/Save_RAM/");
-    getFileHandle();
-    onFileHandleLoad = function(handle) {
-        RAMFileHandle = handle;
+    // alert("Select "+registered_games[args.game_id].ram_path+" in /Emulator Data/Save_RAM/");
+    // getFileHandle();
+    // onFileHandleLoad = function(handle) {
+    //     RAMFileHandle = handle;
+    //     save_current_RAM();
+    //     load_game_pt2(args);
+    // };
+    onFileFromDirLoad = function(fileHandle) {
+        RAMFileHandle = fileHandle;
         save_current_RAM();
         load_game_pt2(args);
     };
+    getFileHandleFromDirectoryHandle(DirectoryHandle, "Save_RAM", registered_games[args.game_id].ram_path);
 };
 load_game_pt2 = function(args) {
     relinquish_control();
@@ -411,12 +442,15 @@ select_rom_pt2 = function() {
 add_registered_game = function() {
     let rom_file = get_file(new_game.rom_path);
     if (rom_file === "no such file") {
-        alert("Place this file in /Emulator Data/ROMs/ and call it "+new_game.rom_path);
-        onSaveEnd = function() {
+        // alert("Place this file in /Emulator Data/ROMs/ and call it "+new_game.rom_path);
+        // onSaveEnd = function() {
+        //     add_registered_game_pt2();
+        // };
+        // saveROM([new_rom]);
+        saveInDirectoryComplete = function() {
             add_registered_game_pt2();
         };
-        console.log(new_rom);
-        saveROM([new_rom]);
+        createFileInDirectory(DirectoryHandle, "ROMs", new_game.rom_path, [new_rom]);
     }else {
         add_registered_game_pt2();
     }
@@ -424,11 +458,15 @@ add_registered_game = function() {
 add_registered_game_pt2 = function() {
     let ram_file = get_file(new_game.ram_path);
     if (ram_file === "no such file") {
-        alert("Place this file in /Emulator Data/Save_RAM/ and call it "+new_game.ram_path);
-        onSaveEnd = function() {
+        // alert("Place this file in /Emulator Data/Save_RAM/ and call it "+new_game.ram_path);
+        // onSaveEnd = function() {
+        //     add_registered_game_pt3();
+        // };
+        // saveRAM(new Uint8Array(0x2000 * 16));
+        saveInDirectoryComplete = function() {
             add_registered_game_pt3();
         };
-        saveRAM(new Uint8Array(0x2000 * 16));
+        createFileInDirectory(DirectoryHandle, "Save_RAM", new_game.ram_path, new Uint8Array(0x2000 * 16));
     }else {
         add_registered_game_pt3();
     }
@@ -442,29 +480,44 @@ add_registered_game_pt3 = function() {
             to_save += "\n";
         }
     }
-    alert("Select registered_games.txt in /Emulator Data/Emulator Settings/");
-    onSaveEnd = function() {};
-    saveText(to_save);
+    // alert("Select registered_games.txt in /Emulator Data/Emulator Settings/");
+    // onSaveEnd = function() {};
+    // saveText(to_save);
     setup_main_menu();
+    saveInDirectoryComplete = function() {};
+    saveToFileInDirectory(DirectoryHandle, "Emulator Settings", "registered_games.txt", to_save);
 };
 forget_all = function() {
     registered_games = [];
-    alert("Select registered_games.txt in /Emulator Data/Emulator Settings/");
-    onSaveEnd = function() {};
-    saveText("");
+    // alert("Select registered_games.txt in /Emulator Data/Emulator Settings/");
+    // onSaveEnd = function() {};
+    // saveText("");
+    saveInDirectoryComplete = function() {};
+    saveToFileInDirectory(DirectoryHandle, "Emulator Settings", "registered_games.txt", "");
 };
 forget_game = function(args) {
     registered_games.splice(args.game_id, 1);
-    alert("Select registered_games.txt in /Emulator Data/Emulator Settings/");
-    onSaveEnd = function() {};
-    saveText("");
+    // alert("Select registered_games.txt in /Emulator Data/Emulator Settings/");
+    // onSaveEnd = function() {};
+    let to_save = "";
+    for (let i = 0; i < registered_games.length; i++) {
+        to_save += JSON.stringify(registered_games[i]);
+        if (i !== registered_games.length-1) {
+            to_save += "\n";
+        }
+    }
+    // saveText(to_save);
     setup_main_menu();
+    saveInDirectoryComplete = function() {};
+    saveToFileInDirectory(DirectoryHandle, "Emulator Settings", "registered_games.txt", to_save);
 };
 wipe_game_ram = function(args) {
-    alert("Select "+registered_games[args.game_id].ram_path+" in /Emulator Data/Save_RAM/");
-    onSaveEnd = function() {};
-    saveRAM(new Uint8Array(0x2000 * 16));
+    // alert("Select "+registered_games[args.game_id].ram_path+" in /Emulator Data/Save_RAM/");
+    // onSaveEnd = function() {};
+    // saveRAM(new Uint8Array(0x2000 * 16));
     setup_main_menu();
+    saveInDirectoryComplete = function() {};
+    saveToFileInDirectory(DirectoryHandle, "Save_RAM", registered_games[args.game_id].ram_path, new Uint8Array(0x2000 * 16));
 };
 let bind_slot = 0;
 trigger_set_keybind = function(args) {
@@ -485,9 +538,11 @@ save_keybinds = function() {
             to_save += "\n";
         }
     }
-    alert("Select keybindings.txt in /Emulator Data/Emulator Settings/");
-    saveText(to_save);
+    // alert("Select keybindings.txt in /Emulator Data/Emulator Settings/");
+    // saveText(to_save);
     setup_main_menu();
+    saveInDirectoryComplete = function() {};
+    saveToFileInDirectory(DirectoryHandle, "Emulator Settings", "keybindings.txt", to_save);
 };
 
 let go = 3;
@@ -545,7 +600,6 @@ function maintain_control() {
             let keybind = "J"+event.button.padStart(2, "0");
             if (!m_menu.next_key_grabbed) {
                 let key = "";
-                console.log(keybind);
                 if (keybind === keybindings[3] || keybind === "J12") {
                     key = "ArrowUp";
                 }else if (keybind === keybindings[1] || keybind === "J13") {
