@@ -3897,7 +3897,7 @@ function run0xFA() {
 function run0xFB() {
     //EI
     interrupts_delayed_true = true;
-    cpu_abort = true;
+    // cpu_abort = true;
     
     cycles += 4;
     if (cpu_dump_intstr === 1) {
@@ -4938,10 +4938,10 @@ function check_cpu_pointer() {
         alert("PC out of boot ROM before execution complete");
         cpu_abort = true;
     }
-    if ((pos >= 0x8000 && pos < 0xC000) || (pos >= 0xE000 && pos < 0xff80)) {
-        alert("PC in peculiar place: "+pos.toString(16));
-        cpu_abort = true;
-    }
+    // if ((pos >= 0x8000 && pos < 0xC000) || (pos >= 0xE000 && pos < 0xff80)) {
+    //     alert("PC in peculiar place: "+pos.toString(16));
+    //     cpu_abort = true;
+    // }
 };
 
 function timing_handler(cyc_run) {

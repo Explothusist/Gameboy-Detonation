@@ -593,7 +593,7 @@ function write(pos, val, message = 1) {
                     } else {
                         console.log("RAM bank deactivated");
                         //alert("Huh?");
-                        mem_abort = true;
+                        //mem_abort = true;
                     }
                     return;
                 } else if (pos < 0x4000) {
