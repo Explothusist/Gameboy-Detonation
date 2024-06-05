@@ -21,7 +21,7 @@ let boot_rom = new Uint8Array([
     0xF5, 0x06, 0x19, 0x78, 0x86, 0x23, 0x05, 0x20, 0xFB, 0x86, 0x20, 0xFE, 0x3E, 0x01, 0xE0, 0x50
 ]);
 
-let run_boot_rom = true;
+let run_boot_rom = false;
 let in_boot_rom = false;
 if (run_boot_rom) {
     in_boot_rom = true;
@@ -592,8 +592,8 @@ function write(pos, val, message = 1) {
                         //mem_suspicious = true;
                     } else {
                         console.log("RAM bank deactivated");
-                        /*alert("Huh?");
-                        mem_abort = true;*/
+                        //alert("Huh?");
+                        mem_abort = true;
                     }
                     return;
                 } else if (pos < 0x4000) {

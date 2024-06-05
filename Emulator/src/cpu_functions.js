@@ -40,14 +40,15 @@ let old_ram = {A: 0, B: 0, C: 0, D: 0, E: 0, H: 0, L: 0, Flag: { Z: false, N: fa
 //Look over interrupts, EI, DI
 //Something up in stack pointer test
 //Investigate all non-CB shifts/rotates
-//1: pass, 2: fail, 3: (Inf RAM deac.), 4: pass, 5: pass, 6: pass
-//7: (Inf RAM deac) 8: (Inf title), 9: fail, 10: pass, 11: pass
+//1: pass, 2: fail, 3: pass, 4: pass, 5: pass, 6: pass
+//7: pass 8: pass, 9: pass, 10: pass, 11: pass
 //
 //Complete: 0,1,2,3,4,5,6,7,8,9,A,B,C,D,E,F
 //Timing:     0,1,2,3,4,5,6,7,8,9,A,B,C,D,E,F
 //CB done:    0,1,2,3,4,5,6,7,8,9,A,B,C,D,E,F
 let break_loop = false;
-let interrupts = true;
+let interrupts = false;
+let interrupts_delayed_true = -1;
 let stopped = false;
 let halt = false; //We can ignore Halt
 let pos = 0x100; //PC
@@ -58,7 +59,7 @@ let cycles = 0;
 let sound_timer = 8183.59375;
 let frames = 0;
 
-let keybindings = ["LeftArrow", "DownArrow", "RightArrow", "UpArrow", "Z", "X", "Enter", "Shift"];
+let keybindings = ["LeftArrow", "DownArrow", "RightArrow", "UpArrow", "z", "x", "Enter", "Shift"];
 
 //01-special:
 //  Passed
@@ -68,7 +69,7 @@ let keybindings = ["LeftArrow", "DownArrow", "RightArrow", "UpArrow", "Z", "X", 
 //  Failed #2
 
 //03-op sp,hl:
-//  infinite RAM Bank Deactivated
+//  Passed
 
 //04-op r, imm:
 //  Passed
@@ -80,13 +81,13 @@ let keybindings = ["LeftArrow", "DownArrow", "RightArrow", "UpArrow", "Z", "X", 
 //  Passed
 
 //07-jr,jp,call,ret,rst:
-//  NOP (jump into memory)
+//  Passed
 
 //08-misc instrs:
-//  NOP (jump into memory)
+//  Passed
 
 //09-op r,r:
-//  NOP (jump into memory)
+//  Passed
 
 //10-bit ops:
 //  Passed
@@ -558,7 +559,8 @@ function run0x06() {
 }
 function run0x07() {
     //RLCA
-    ram.setA(rlc(ram.getA(), 1, 0, 0, 1));
+    ram.setA(rlc(ram.getA(), 0, 0, 0, 1));
+    ram.Flag.Z = false;
     ram.Flag.N = false;
     ram.Flag.H = false;
     
@@ -572,7 +574,10 @@ function run0x08() {
     //LD (nn), SP
     let n1 = get_byte();
     let n2 = get_byte();
-    ram.setSP(combine_2b8(n2, n1));
+    let addr = combine_2b8(n2, n1);
+    let bytes = split_b16(ram.getSP());
+    write(addr, bytes[1]);
+    write(addr+1, bytes[0]);
     
     cycles += 20;
     if (cpu_dump_intstr === 1) {
@@ -647,7 +652,8 @@ function run0x0E() {
 }
 function run0x0F() {
     //RRCA
-    ram.A = rrc(ram.A, 1, 0, 0, 1);
+    ram.A = rrc(ram.A, 0, 0, 0, 1);
+    ram.Flag.Z = false;
     ram.Flag.N = false;
     ram.Flag.H = false;
     
@@ -736,7 +742,8 @@ function run0x16() {
 }
 function run0x17() {
     //RLA
-    ram.A = rl(ram.A, 1, 0, 0, 1);
+    ram.A = rl(ram.A, 0, 0, 0, 1);
+    ram.Flag.Z = false;
     ram.Flag.N = false;
     ram.Flag.H = false;
     
@@ -827,13 +834,14 @@ function run0x1E() {
 }
 function run0x1F() {
     //RRA
-    ram.A = rr(ram.A, 1, 0, 0, 1);
+    ram.A = rr(ram.A, 0, 0, 0, 1);
+    ram.Flag.Z = false;
     ram.Flag.N = false;
     ram.Flag.H = false;
     
     cycles += 4;
     if (cpu_dump_intstr === 1) {
-        console.log("0x0F RRA");
+        console.log("0x1F RRA");
         console.log("A:" + ram.A.toString(16));
     }
 }
@@ -2357,28 +2365,7 @@ function run0x9E() {
 }
 function run0x9F() {
     //SBC A, A
-    let car = 0;
-    if (ram.Flag.C) {
-        car = 1;
-    }
-    let keepH = false;
-    let keepC = false;
-    let old_A = ram.A;
-    ram.A = alub8adder(ram.A, -car, 1, 0, -1, -1);
-    if (ram.Flag.H) {
-        keepH = true;
-    }
-    if (ram.Flag.C) {
-        keepC = true;
-    }
-    ram.A = alub8adder(ram.A, -old_A, 1, 0, -1, -1);
-    if (keepH) {
-        ram.Flag.H = true;
-    }
-    if (keepC) {
-        ram.Flag.C = true;
-    }
-    ram.Flag.N = false;
+    sbcA(ram.A);
     
     cycles += 4;
     if (cpu_dump_intstr === 1) {
@@ -3477,7 +3464,7 @@ function run0xD9() {
     
     let ret = stackpopb16();
     pos = combine_2b8(ret[0], ret[1]);
-    interrupts = true;
+    interrupts_delayed_true = true;
     cycles += 16;
     if (cpu_dump_intstr === 1) {
         console.log("0xD9 RETI");
@@ -3633,7 +3620,30 @@ function run0xE8() {
     if (signed >= 0b1000_0000) {
         signed = -(~(signed - 1) & 0b1111_1111);
     }
-    ram.SP = alub16adder(ram.SP, [0, signed], 0, 0, 1, 1);
+    let old_SP0 = ram.getSP();
+    if (signed >= 0) {
+        ram.SP[1] = alub8adder(ram.SP[1], signed, 0, 0, 1, 1);
+        if (ram.Flag.C) {
+            ram.SP[0] = alub8adder(ram.SP[0], 1, 0, 0, 0, 0);
+        }
+    }else {
+        ram.SP[1] = alub8adder(ram.SP[1], signed, 0, 0, -1, -1);
+        if (ram.Flag.C) {
+            ram.SP[0] = alub8adder(ram.SP[0], -1, 0, 0, 0, 0);
+        }
+
+        let sudo_SP0 = old_SP0+signed;
+        if ((sudo_SP0 & 0xFF) <= (old_SP0 & 0xFF)) {
+            ram.Flag.C = true;
+        }else {
+            ram.Flag.C = false;
+        }
+        if ((sudo_SP0 & 0xF) <= (old_SP0 & 0xF)) {
+            ram.Flag.H = true;
+        }else {
+            ram.Flag.H = false;
+        }
+    }
     ram.Flag.Z = false;
     ram.Flag.N = false;
     
@@ -3658,6 +3668,10 @@ function run0xEA() {
     let n1 = get_byte();
     let n2 = get_byte();
     write(combine_2b8(n2, n1), ram.A);
+
+    // console.log("EA");
+    // console.log(n2.toString(16).padStart(2, "0")+n1.toString(16).padStart(2, "0"));
+    // console.log(combine_2b8(n2, n1).toString(16).padStart(4, "0"));
     
     cycles += 16;
     if (cpu_dump_intstr === 1) {
@@ -3747,6 +3761,7 @@ function run0xF2() {
 function run0xF3() {
     //DI
     interrupts = false;
+    interrupts_delayed_true = -1;
     
     cycles += 4;
     if (cpu_dump_intstr === 1) {
@@ -3818,7 +3833,31 @@ function run0xF8() {
     if (signed >= 0b1000_0000) {
         signed = -(~(signed - 1) & 0b1111_1111);
     }
-    let ret = alub16adder([ram.SP[0], ram.SP[1]], [0, signed], 0, 0, 1, 1);
+    let old_SP0 = ram.getSP();
+    let ret = Array.from(ram.SP);
+    if (signed >= 0) {
+        ret[1] = alub8adder(ret[1], signed, 0, 0, 1, 1);
+        if (ram.Flag.C) {
+            ret[0] = alub8adder(ret[0], 1, 0, 0, 0, 0);
+        }
+    }else {
+        ret[1] = alub8adder(ret[1], signed, 0, 0, -1, -1);
+        if (ram.Flag.C) {
+            ret[0] = alub8adder(ret[0], -1, 0, 0, 0, 0);
+        }
+
+        let sudo_SP0 = old_SP0+signed;
+        if ((sudo_SP0 & 0xFF) <= (old_SP0 & 0xFF)) {
+            ram.Flag.C = true;
+        }else {
+            ram.Flag.C = false;
+        }
+        if ((sudo_SP0 & 0xF) <= (old_SP0 & 0xF)) {
+            ram.Flag.H = true;
+        }else {
+            ram.Flag.H = false;
+        }
+    }
     ram.Flag.Z = false;
     ram.Flag.N = false;
     ram.setHL(combine_2b8(ret[0], ret[1]));
@@ -3845,6 +3884,10 @@ function run0xFA() {
     let n2 = get_byte();
     ram.A = read(combine_2b8(n2, n1));
     
+    // console.log("FA");
+    // console.log(n2.toString(16).padStart(2, "0")+n1.toString(16).padStart(2, "0"));
+    // console.log(combine_2b8(n2, n1).toString(16).padStart(4, "0"));
+
     cycles += 16;
     if (cpu_dump_intstr === 1) {
         console.log("0xFA LD A, (nn)");
@@ -3853,7 +3896,8 @@ function run0xFA() {
 }
 function run0xFB() {
     //EI
-    interrupts = true;
+    interrupts_delayed_true = true;
+    cpu_abort = true;
     
     cycles += 4;
     if (cpu_dump_intstr === 1) {
@@ -4894,14 +4938,18 @@ function check_cpu_pointer() {
         alert("PC out of boot ROM before execution complete");
         cpu_abort = true;
     }
+    if ((pos >= 0x8000 && pos < 0xC000) || (pos >= 0xE000 && pos < 0xff80)) {
+        alert("PC in peculiar place: "+pos.toString(16));
+        cpu_abort = true;
+    }
 };
 
 function timing_handler(cyc_run) {
     if (!stopped) {
         cyc_run = cyc_run || 0;
 
-        cpu_timestamp = new Date();
-        console.log(cpu_timestamp.getTime());
+        //cpu_timestamp = new Date();
+        //console.log(cpu_timestamp.getTime());
         
         if (cyc_run === 0) {
             // Safety in case we get off somehow
@@ -4914,6 +4962,10 @@ function timing_handler(cyc_run) {
 
                 spc_reg(cycles);
                 interrupt_handle();
+                if (interrupts_delayed_true) {
+                    interrupts = true;
+                    interrupts_delayed_true = false;
+                }
                 draw_dots(cycles-old_cycles, XFF00, read);
                 if (dma === 1) {
                     cycles += 160;
@@ -5014,8 +5066,8 @@ function timing_handler(cyc_run) {
 
         //draw(XFF00, read);
 
-        cpu_timestamp = new Date();
-        console.log(cpu_timestamp.getTime() + " : frame " + frames);
+        //cpu_timestamp = new Date();
+        console.log(/*cpu_timestamp.getTime() + */" : frame " + frames);
     } else {
         console.log("Waiting for key press...");
     }
