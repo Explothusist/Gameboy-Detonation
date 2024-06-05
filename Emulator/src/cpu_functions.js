@@ -48,7 +48,7 @@ let old_ram = {A: 0, B: 0, C: 0, D: 0, E: 0, H: 0, L: 0, Flag: { Z: false, N: fa
 //CB done:    0,1,2,3,4,5,6,7,8,9,A,B,C,D,E,F
 let break_loop = false;
 let interrupts = false;
-let interrupts_delayed_true = -1;
+let interrupts_delayed_true = false;
 let stopped = false;
 let halt = false; //We can ignore Halt
 let pos = 0x100; //PC
@@ -3761,7 +3761,7 @@ function run0xF2() {
 function run0xF3() {
     //DI
     interrupts = false;
-    interrupts_delayed_true = -1;
+    interrupts_delayed_true = false;
     
     cycles += 4;
     if (cpu_dump_intstr === 1) {
