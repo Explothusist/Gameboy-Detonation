@@ -21,7 +21,7 @@ let boot_rom = new Uint8Array([
     0xF5, 0x06, 0x19, 0x78, 0x86, 0x23, 0x05, 0x20, 0xFB, 0x86, 0x20, 0xFE, 0x3E, 0x01, 0xE0, 0x50
 ]);
 
-let run_boot_rom = false;
+let run_boot_rom = true;
 let in_boot_rom = false;
 if (run_boot_rom) {
     in_boot_rom = true;
@@ -88,9 +88,9 @@ function setup(rom) {
     let rom_size = rom[0x148];
     let ram_size = rom[0x149];
     let offset = 0;
-    console.log("Cartridge Type: " + car_type.toString(16));
-    console.log("ROM Size: " + rom_size.toString(16));
-    console.log("RAM Size: " + ram_size);
+    //console.log("Cartridge Type: " + car_type.toString(16));
+    //console.log("ROM Size: " + rom_size.toString(16));
+    //console.log("RAM Size: " + ram_size);
     if (rom[0x143] === 0x80) {
         alert("Color GameBoy Cartridge: Cannot be run.");
         //return;
@@ -106,7 +106,7 @@ function setup(rom) {
                 X4000[i] = rom[i + offset];
             }
             offset += 0x4000;
-            console.log("2 bank ROM");
+            //console.log("2 bank ROM");
             break;
         case 1:
             //4 bank
@@ -127,7 +127,7 @@ function setup(rom) {
             }
             offset += 0x4000;
             X4000 = rombanks[1];
-            console.log("4 bank ROM");
+            //console.log("4 bank ROM");
             break;
         case 2:
             //8 bank
@@ -163,7 +163,7 @@ function setup(rom) {
             }
             offset += 0x4000;
             X4000 = rombanks[1];
-            console.log("8 bank ROM");
+            //console.log("8 bank ROM");
             break;
         case 3:
             //16 bank
@@ -178,7 +178,7 @@ function setup(rom) {
                 offset += 0x4000;
             }
             X4000 = rombanks[1];
-            console.log("16 bank ROM");
+            //console.log("16 bank ROM");
             break;
         case 4:
             //32 bank
@@ -193,7 +193,7 @@ function setup(rom) {
                 offset += 0x4000;
             }
             X4000 = rombanks[1];
-            console.log("32 bank ROM");
+            //console.log("32 bank ROM");
             break;
         case 5:
             //64 bank
@@ -208,7 +208,7 @@ function setup(rom) {
                 offset += 0x4000;
             }
             X4000 = rombanks[1];
-            console.log("64 bank ROM");
+            //console.log("64 bank ROM");
             break;
         case 6:
             //128 bank
@@ -223,7 +223,7 @@ function setup(rom) {
                 offset += 0x4000;
             }
             X4000 = rombanks[1];
-            console.log("128 bank ROM");
+            //console.log("128 bank ROM");
             break;
         case 0x52:
             //72 bank
@@ -238,7 +238,7 @@ function setup(rom) {
                 offset += 0x4000;
             }
             X4000 = rombanks[1];
-            console.log("72 bank ROM");
+            //console.log("72 bank ROM");
             break;
         case 0x53:
             //80 bank
@@ -253,7 +253,7 @@ function setup(rom) {
                 offset += 0x4000;
             }
             X4000 = rombanks[1];
-            console.log("80 bank ROM");
+            //console.log("80 bank ROM");
             break;
         case 0x54:
             //96 bank
@@ -268,7 +268,7 @@ function setup(rom) {
                 offset += 0x4000;
             }
             X4000 = rombanks[1];
-            console.log("96 bank ROM");
+            //console.log("96 bank ROM");
             break;
         default:
             alert("ERROR: invalid ROM size");
@@ -276,23 +276,23 @@ function setup(rom) {
     switch (ram_size) {
         case 0:
             //None
-            console.log("No RAM");
+            //console.log("No RAM");
             break;
         case 1:
             //1 bank
-            console.log("1 bank RAM");
+            //console.log("1 bank RAM");
             break;
         case 2:
             //1 bank
-            console.log("1 bank RAM");
+            //console.log("1 bank RAM");
             break;
         case 3:
             //4 bank
-            console.log("4 bank RAM");
+            //console.log("4 bank RAM");
             break;
         case 4:
             //16 bank
-            console.log("16 bank RAM");
+            //console.log("16 bank RAM");
             break;
         default:
             alert("ERROR: invalid RAM size");
@@ -301,119 +301,119 @@ function setup(rom) {
         case 0:
             //ROM Only
             car_type = 0;
-            console.log("ROM Only");
+            //console.log("ROM Only");
             break;
         case 1:
             //ROM+MBC1
             car_type = 1;
-            console.log("ROM + MBC1");
+            //console.log("ROM + MBC1");
             break;
         case 2:
             //ROM+MBC1+RAM
             car_type = 1;
-            console.log("ROM + MBC1 + RAM");
+            //console.log("ROM + MBC1 + RAM");
             break;
         case 3:
             //ROM+MBC1+RAM+BATT
             car_type = 1;
             batt = 1;
-            console.log("ROM + MBC1 + RAM + BATT");
+            //console.log("ROM + MBC1 + RAM + BATT");
             break;
         case 5:
             //ROM+MBC2
             car_type = 2;
-            console.log("ROM + MBC2");
+            //console.log("ROM + MBC2");
             break;
         case 6:
             //ROM+MBC2+BATT
             car_type = 2;
             batt = 1;
-            console.log("ROM + MBC2 + BATT");
+            //console.log("ROM + MBC2 + BATT");
             break;
         case 8:
             //ROM+RAM
             car_type = 0;
-            console.log("ROM + RAM");
+            //console.log("ROM + RAM");
             break;
         case 9:
             //ROM+RAM+BATT
             car_type = 0;
             batt = 1;
-            console.log("ROM + RAM + BATT");
+            //console.log("ROM + RAM + BATT");
             break;
         case 0xb:
             //ROM+MMMO1
             car_type = 2;
-            console.log("ROM + MMM01");
+            //console.log("ROM + MMM01");
             break;
         case 0xc:
             //ROM+MMMO1+SRAM
             car_type = 2;
             sram = 1;
-            console.log("ROM + MMM01 + SRAM");
+            //console.log("ROM + MMM01 + SRAM");
             break;
         case 0xd:
             //ROM+MMMO1+SRAM+BATT
             car_type = 2;
             sram = 1;
             batt = 1;
-            console.log("ROM + MMM01 + SRAM + BATT");
+            //console.log("ROM + MMM01 + SRAM + BATT");
             break;
         case 0xf:
             //ROM+MBC3+TIMER+BATT
             car_type = 3;
             batt = 1;
-            console.log("ROM + MBC3 + TIMER + BATT");
+            //console.log("ROM + MBC3 + TIMER + BATT");
             break;
         case 0x10:
             //ROM+MBC3+TIMER+RAM+BATT
             car_type = 3;
             batt = 1;
-            console.log("ROM + MBC3 + TIMER + RAM + BATT");
+            //console.log("ROM + MBC3 + TIMER + RAM + BATT");
             break;
         case 0x11:
             //ROM+MBC3
             car_type = 3;
-            console.log("ROM + MBC3");
+            //console.log("ROM + MBC3");
             break;
         case 0x12:
             //ROM+MCB3+RAM
             car_type = 3;
-            console.log("ROM + MBC3 + RAM");
+            //console.log("ROM + MBC3 + RAM");
             break;
         case 0x13:
             //ROM+MCB3+RAM+BATT
             car_type = 3;
             batt = 1;
-            console.log("ROM + MBC3 + RAM + BATT");
+            //console.log("ROM + MBC3 + RAM + BATT");
             break;
         case 0x19:
             //ROM+MCB5
             car_type = 5;
-            console.log("ROM + MBC5");
+            //console.log("ROM + MBC5");
             break;
         case 0x1a:
             //ROM+MCB5+RAM
             car_type = 5;
-            console.log("ROM + MBC5 + RAM");
+            //console.log("ROM + MBC5 + RAM");
             break;
         case 0x1b:
             //ROM+MCB5+RAM+BATT
-            console.log("ROM + MBC5 + RAM + BATT");
+            //console.log("ROM + MBC5 + RAM + BATT");
             car_type = 5;
             break;
         case 0x1c:
             //ROM+MCB5+RUMBLE
             car_type = 5;
             rumble = 1;
-            console.log("ROM + MBC5 + RUMBLE");
+            //console.log("ROM + MBC5 + RUMBLE");
             break;
         case 0x1d:
             //ROM+MCB5+RUMBLE+SRAM
             car_type = 5;
             rumble = 1;
             sram = 1;
-            console.log("ROM + MBC5 + RUMBLE + SRAM");
+            //console.log("ROM + MBC5 + RUMBLE + SRAM");
             break;
         case 0x1e:
             //ROM+MCB5+RUMBLE+SRAM+BATT
@@ -421,7 +421,7 @@ function setup(rom) {
             rumble = 1;
             sram = 1;
             batt = 1;
-            console.log("ROM + MBC5 + RUMBLE + SRAM + BATT");
+            //console.log("ROM + MBC5 + RUMBLE + SRAM + BATT");
             break;
         case 0x1f:
             //Pocket Camera
@@ -448,6 +448,14 @@ function setup(rom) {
     }
 }
 
+
+let sound_registers = [
+    0x80, 0x3f, 0x00, 0xff, 0xbf,
+    0xff, 0x3f, 0x00, 0xff, 0xbf,
+    0x7f, 0xff, 0x9f, 0xff, 0xbf,
+    0xff, 0xff, 0x00, 0x00, 0xbf,
+    0x00, 0x00, 0x70
+];
 function read(pos, message = 1) {
     let dump = mem_dump_instr * message;
     if (pos < 0x4000) {
@@ -457,37 +465,37 @@ function read(pos, message = 1) {
         }
         //ROM bank 0
         if (dump === 1) {
-            console.log("ROM bank 0 read");
+            //console.log("ROM bank 0 read");
         }
         return X0000[pos];
     } else if (pos < 0x8000) {
         //switchable ROM bank
         if (dump === 1) {
-            console.log("Switchable ROM bank " + rombank + " read");
+            //console.log("Switchable ROM bank " + rombank + " read");
         }
         return X4000[pos - 0x4000];
     } else if (pos < 0xa000) {
         //Video RAM
         if (dump === 1) {
-            console.log("Video RAM read");
+            //console.log("Video RAM read");
         }
         return X8000[pos - 0x8000];
     } else if (pos < 0xc000) {
         //Switchable RAM bank
         if (car_type === 2) {
             if (dump === 1) {
-                console.log("Switchable RAM bank " + rambank + " read");
+                //console.log("Switchable RAM bank " + rambank + " read");
             }
             return XA000[pos - 0xa000] & 0b1111;
         } else if (car_type !== 3) {
             if (dump === 1) {
-                console.log("Switchable RAM bank " + rambank + " read");
+                //console.log("Switchable RAM bank " + rambank + " read");
             }
             return XA000[pos - 0xa000];
         } else {
             if (rtc_mode === -1) {
                 if (dump === 1) {
-                    console.log("Switchable RAM bank " + rambank + " read");
+                    //console.log("Switchable RAM bank " + rambank + " read");
                 }
                 return XA000[pos - 0xa000];
             } else {
@@ -512,34 +520,32 @@ function read(pos, message = 1) {
                     default:
                         alert("This RCT stuff is not working. Oops, RTC.");
                 }
-                console.log("RTC register 0x" + rtc_mode.toString(16) + " read");
+                //console.log("RTC register 0x" + rtc_mode.toString(16) + " read");
                 return ret;
             }
         }
     } else if (pos < 0xe000) {
         //Internal RAM
         if (dump === 1) {
-            console.log("Internal RAM read");
+            //console.log("Internal RAM read");
         }
         return XC000[pos - 0xc000];
     } else if (pos < 0xfe00) {
         //Echo RAM
         if (dump === 1) {
-            console.log(" !! ALERT !! Echo RAM read");
+            //console.log(" !! ALERT !! Echo RAM read");
         }
         return XE000[pos - 0xe000];
     } else if (pos < 0xfea0) {
         //Sprite Attribute Memory (OAB)
         if (dump === 1) {
-            console.log("Sprite Attribute memory read");
+            //console.log("Sprite Attribute memory read");
         }
         return XFE00[pos - 0xfe00];
     } else if (pos < 0xff00) {
         //Empty (+ Unusable?)
         if (dump === 1) {
-            console.log(
-                " !! ALERT !! Probably unusable memory read: " + pos.toString(16)
-            );
+            //console.log(" !! ALERT !! Probably unusable memory read: " + pos.toString(16));
         }
         alert(" !! ALERT !! Unusable memory read: " + pos.toString(16));
         mem_abort = true;
@@ -547,25 +553,28 @@ function read(pos, message = 1) {
     } else if (pos < 0xff4c) {
         //I/O Ports
         if (dump === 1) {
-            console.log("I/O Ports read");
+            //console.log("I/O Ports read");
+        }
+        if (pos >= 0xff10 && pos <= 0xff26) {
+            return (XFF00[pos - 0xff00] | sound_registers[pos - 0xff10]);
         }
         return XFF00[pos - 0xff00];
     } else if (pos < 0xff80) {
         //Empty (+ I/O ports?)
         if (dump === 1) {
-            console.log(" ?? CAUTION ?? Probably I/O ports extension read");
+            //console.log(" ?? CAUTION ?? Probably I/O ports extension read");
         }
         return XFF4C[pos - 0xff4c];
     } else if (pos < 0xffff) {
         //Internal HRAM
         if (dump === 1) {
-            console.log("Internal HRAM read");
+            //console.log("Internal HRAM read");
         }
         return XFF80[pos - 0xff80];
     } else {
         //Interrupt Enable Register
         if (dump === 1) {
-            console.log("Interrupt Enable Register read");
+            //console.log("Interrupt Enable Register read");
         }
         return XFFFF;
     }
@@ -577,9 +586,8 @@ function dma_trans(pos) {
         XFE00[i] = read(addr + i);
     }
     dma = 1;
-    console.log("DMA Transfer Complete");
+    //console.log("DMA Transfer Complete");
 }
-
 function write(pos, val, message = 1) {
     let dump = mem_dump_instr * message;
     if (pos < 0x8000) {
@@ -587,11 +595,11 @@ function write(pos, val, message = 1) {
             case 1:
                 if (pos < 0x2000) {
                     if ((val & 0b0000_1111) === 0b1010) {
-                        console.log("RAM bank activated");
+                        //console.log("RAM bank activated");
                         //alert("mem_suspicious RAM Bank activation");
                         //mem_suspicious = true;
                     } else {
-                        console.log("RAM bank deactivated");
+                        //console.log("RAM bank deactivated");
                         //alert("Huh?");
                         //mem_abort = true;
                     }
@@ -603,7 +611,7 @@ function write(pos, val, message = 1) {
                     }
                     let bank = rombank + (romhigh << 5);
                     X4000 = rombanks[bank];
-                    //console.log("ROM bank changed to bank " + bank);
+                    ////console.log("ROM bank changed to bank " + bank);
                     if (bank !== val) {
                         alert(val.toString(2) +" written, changed to " + bank.toString(2) +    "\nfirst: " + rombank.toString(2) + " high: " + romhigh.toString(2));
                         //mem_abort = true;
@@ -614,7 +622,7 @@ function write(pos, val, message = 1) {
                         romhigh = val & 0b0000_0011;
                         let bank = rombank + (romhigh << 5);
                         X4000 = rombanks[bank];
-                        console.log("ROM bank changed to bank " + bank);
+                        //console.log("ROM bank changed to bank " + bank);
                         alert("ROM bank high changed!");
                         //mem_abort = true;
                         return;
@@ -623,7 +631,7 @@ function write(pos, val, message = 1) {
                         rambanks[pram] = XA000;
                         XA000 = rambanks[rambank];
                         pram = rambank;
-                        console.log("RAM bank changed to bank " + rambank);
+                        //console.log("RAM bank changed to bank " + rambank);
                         return;
                     }
                 } else if (pos < 0x8000) {
@@ -651,7 +659,7 @@ function write(pos, val, message = 1) {
                         X4000 = rombanks[bank];
                     }
                     if (dump === 1) {
-                        console.log("Memory mode changed");
+                        //console.log("Memory mode changed");
                     }
                     return;
                 }
@@ -660,35 +668,35 @@ function write(pos, val, message = 1) {
                 if (pos < 0x2000) {
                     if (dump === 1) {
                         if ((pos & 0b1_0000_0000) >> 8 !== 0) {
-                            console.log("Invalid address to change RAM bank");
+                            //console.log("Invalid address to change RAM bank");
                         }
                         if ((val & 0b0000_1111) === 0b1010) {
-                            console.log("RAM bank activated");
+                            //console.log("RAM bank activated");
                         } else {
-                            console.log("RAM bank deactivated");
+                            //console.log("RAM bank deactivated");
                         }
                     }
                     return;
                 } else if (pos < 0x4000) {
                     if ((pos & 0b1_0000_0000) >> 8 !== 1) {
-                        console.log("Invalid address to change ROM bank");
+                        //console.log("Invalid address to change ROM bank");
                     }
                     rombank = val & 0b0000_1111;
                     if (rombank === 0) {
                         rombank = 1;
                     }
                     X4000 = rombanks[rombank];
-                    console.log("ROM bank changed to bank " + rombank);
+                    //console.log("ROM bank changed to bank " + rombank);
                     return;
                 }
                 break;
             case 3:
                 if (pos < 0x2000) {
                     if ((val & 0b0000_1111) === 0b1010) {
-                        console.log("RAM/RTC bank activated");
+                        //console.log("RAM/RTC bank activated");
                         rtc_ram_act = 1;
                     } else {
-                        console.log("RAM/RTC bank deactivated");
+                        //console.log("RAM/RTC bank deactivated");
                         rtc_ram_act = 0;
                     }
                     return;
@@ -698,24 +706,24 @@ function write(pos, val, message = 1) {
                         rombank = 1;
                     }
                     X4000 = rombanks[rombank];
-                    console.log("ROM bank changed to bank " + rombank);
+                    //console.log("ROM bank changed to bank " + rombank);
                     return;
                 } else if (pos < 0x6000) {
                     if ((val & 0b1111) <= 7) {
                         rambank = val & 0b0000_0111;
                         XA000 = rambanks[rambank];
                         rtc_mode = -1;
-                        console.log("RAM bank changed to bank " + rambank);
+                        //console.log("RAM bank changed to bank " + rambank);
                     } else if ((val & 0b1111) <= 0xc) {
                         rtc_mode = val & 0b1111;
-                        console.log("RTC set to 0x" + rtc_mode.toString(16));
+                        //console.log("RTC set to 0x" + rtc_mode.toString(16));
                     }
                     return;
                 } else if (pos < 0x8000) {
                     mem_mode = val & 0b0000_0001;
                     if (dump === 1) {
                         //Clock latch, redo when ram rebuilt
-                        console.log("RTC latched");
+                        //console.log("RTC latched");
                     }
                     return;
                 }
@@ -726,22 +734,22 @@ function write(pos, val, message = 1) {
             case 5:
                 if (pos < 0x2000) {
                     if ((val & 0b0000_1111) === 0b1010) {
-                        console.log("RAM bank activated");
+                        //console.log("RAM bank activated");
                     } else {
-                        console.log("RAM bank deactivated");
+                        //console.log("RAM bank deactivated");
                     }
                     return;
                 } else if (pos < 0x3000) {
                     rombank = val;
                     let bank = rombank + (romhigh << 8);
                     X4000 = rombanks[bank];
-                    console.log("ROM bank changed to bank " + bank);
+                    //console.log("ROM bank changed to bank " + bank);
                     return;
                 } else if (pos < 0x4000) {
                     romhigh = val & 1;
                     let bank = rombank + (romhigh << 8);
                     X4000 = rombanks[bank];
-                    console.log("ROM bank changed to bank " + bank);
+                    //console.log("ROM bank changed to bank " + bank);
                     return;
                 } else if (pos < 0x6000) {
                     if (rumble === 0) {
@@ -751,7 +759,7 @@ function write(pos, val, message = 1) {
                         rumble_on = val & 0b0000_1000;
                     }
                     XA000 = rambanks[rambank];
-                    console.log("RAM bank changed to bank " + rambank);
+                    //console.log("RAM bank changed to bank " + rambank);
                     return;
                 }
                 break;
@@ -762,7 +770,7 @@ function write(pos, val, message = 1) {
         if (pos >= 0x8000 && pos < 0xa000) {
             //Video RAM
             if (mem_dump_instr === 1) {
-                console.log("Video RAM written");
+                //console.log("Video RAM written");
             }
             X8000[pos - 0x8000] = val;
             return;
@@ -771,25 +779,25 @@ function write(pos, val, message = 1) {
             if (car_type === 2) {
                 XA000[pos - 0xa000] = val & 0b1111;
                 if (dump === 1) {
-                    console.log("Switchable RAM bank " + rambank + " written");
+                    //console.log("Switchable RAM bank " + rambank + " written");
                 }
             } else if (car_type !== 3) {
                 XA000[pos - 0xa000] = val;
                 if (dump === 1) {
-                    console.log("Switchable RAM bank " + rambank + " written");
+                    //console.log("Switchable RAM bank " + rambank + " written");
                 }
             } else {
                 if (rtc_mode === -1) {
                     XA000[pos - 0xa000] = val;
                     if (dump === 1) {
-                        console.log("Switchable RAM bank " + rambank + " written");
+                        //console.log("Switchable RAM bank " + rambank + " written");
                     }
                 } else {
                     if (rtc_mode === 0xc) {
                         rtc_act = (val & 0b0100_0000) >> 6;
                     }
                     if (dump === 1) {
-                        console.log("RTC register 0x" + rtc_mode + " written");
+                        //console.log("RTC register 0x" + rtc_mode + " written");
                     }
                 }
             }
@@ -797,7 +805,7 @@ function write(pos, val, message = 1) {
         } else if (pos < 0xe000) {
             //Internal RAM
             if (dump === 1) {
-                console.log("Internal RAM written");
+                //console.log("Internal RAM written");
             }
             XC000[pos - 0xc000] = val;
             XE000[pos - 0xe000] = val;
@@ -805,7 +813,7 @@ function write(pos, val, message = 1) {
         } else if (pos < 0xfe00) {
             //Echo RAM
             if (dump === 1) {
-                console.log(" !! ALERT !! Echo RAM written: " + pos.toString(16));
+                //console.log(" !! ALERT !! Echo RAM written: " + pos.toString(16));
             }
             XC000[pos - 0xc000] = val;
             XE000[pos - 0xe000] = val;
@@ -813,16 +821,14 @@ function write(pos, val, message = 1) {
         } else if (pos < 0xfea0) {
             //Sprite Attribute Memory (OAB)
             if (dump === 1) {
-                console.log(" ?? CAUTION ?? Sprite Attribute memory written");
+                //console.log(" ?? CAUTION ?? Sprite Attribute memory written");
             }
             XFE00[pos - 0xfe00] = val;
             return;
         } else if (pos < 0xff00) {
             //Empty (+ Unusable?)
             if (dump === 1) {
-                console.log(
-                    " !! ALERT !! Probably unusable memory written: " + pos.toString(16)
-                );
+                //console.log(" !! ALERT !! Probably unusable memory written: " + pos.toString(16));
             }
             //alert(" !! ALERT !! Unusable memory written: " + pos.toString(16));
             //mem_abort = true;
@@ -831,26 +837,26 @@ function write(pos, val, message = 1) {
         } else if (pos < 0xff4c) {
             //I/O Ports+Special Registers
             if (dump === 1) {
-                console.log("I/O Ports/Special Registers written");
+                //console.log("I/O Ports/Special Registers written");
             }
             if (pos === 0xff01) {
                 if (testrom) {
                     lastff01 = val;
                     trommess += String.fromCharCode(lastff01).toString();
                     alert("One... \n" + trommess);
-                    console.log(String.fromCharCode(lastff01));
+                    //console.log(String.fromCharCode(lastff01));
                 }
             } else if (pos === 0xff01) {
                 if (testrom) {
                     if (val === 0x82) {
-                        console.log(String.fromCharCode(lastff01));
+                        //console.log(String.fromCharCode(lastff01));
                         alert("Two!");
                     }
                 }
             } else if (pos === 0xff04) {
                 //Div Timer
                 XFF00[4] = 0;
-            } else if (pos === 0xff11) {
+            }else if (pos === 0xff11) {
                 //NR11 Length Counter
                 val &= 0b1100_0000;
                 val |= 0b0011_1111;
@@ -883,21 +889,21 @@ function write(pos, val, message = 1) {
             }
             //Empty (+ I/O ports?)
             if (dump === 1) {
-                console.log(" ?? CAUTION ?? Probably I/O ports extension written");
+                //console.log(" ?? CAUTION ?? Probably I/O ports extension written");
             }
             XFF4C[pos - 0xff4c] = val;
             return XFF4C[pos - 0xff4c];
         } else if (pos < 0xffff) {
             //Internal HRAM
             if (dump === 1) {
-                console.log("Internal HRAM written");
+                //console.log("Internal HRAM written");
             }
             XFF80[pos - 0xff80] = val;
             return;
         } else {
             //Interrupt Enable Register
             if (dump === 1) {
-                console.log("Interrupt Enable Register written");
+                //console.log("Interrupt Enable Register written");
             }
             XFFFF = val;
             return;

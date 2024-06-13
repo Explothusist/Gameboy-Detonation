@@ -59,7 +59,7 @@ let cycles = 0;
 let sound_timer = 8183.59375;
 let frames = 0;
 
-let keybindings = ["LeftArrow", "DownArrow", "RightArrow", "UpArrow", "z", "x", "Enter", "Shift"];
+let keybindings = ["ArrowLeft", "ArrowDown", "ArrowRight", "ArrowUp", "z", "x", "Enter", "Shift"];
 
 //01-special:
 //  Passed
@@ -4744,7 +4744,7 @@ function interrupt_handle() {
             pos = 0x40;
             interrupts = false;
             write(0xff0f, xff0f, 0);
-            console.log("V-Blank Interrupt thrown");
+            // console.log("V-Blank Interrupt thrown");
             return;
         }
     }
@@ -4755,7 +4755,7 @@ function interrupt_handle() {
             stackpushb16(split_b16(pos));
             pos = 0x48;
             write(0xff0f, xff0f, 0);
-            console.log("LCDC Scan Line Interrupt thrown");
+            // console.log("LCDC Scan Line Interrupt thrown");
             return;
         }
     }
@@ -4766,7 +4766,7 @@ function interrupt_handle() {
             stackpushb16(split_b16(pos));
             pos = 0x50;
             write(0xff0f, xff0f, 0);
-            console.log("Timer Overflow Interrupt thrown");
+            // console.log("Timer Overflow Interrupt thrown");
             return;
         }
     }
@@ -4778,7 +4778,7 @@ function interrupt_handle() {
             stackpushb16(split_b16(pos));
             pos = 0x60;
             write(0xff0f, xff0f, 0);
-            console.log("Key Input High-to-Low Interrupt thrown");
+            // console.log("Key Input High-to-Low Interrupt thrown");
             return;
         }
     }
@@ -4944,6 +4944,7 @@ function check_cpu_pointer() {
     // }
 };
 
+let snd_store_cycles = 0;
 function timing_handler(cyc_run) {
     if (!stopped) {
         cyc_run = cyc_run || 0;
@@ -4973,7 +4974,12 @@ function timing_handler(cyc_run) {
                 }
                 if (cycles > sound_timer) {
                     sound_timer += 8183.59375;
-                    //XFF00 = frame_sequencer(XFF00);
+                    XFF00 = frame_sequencer(XFF00);
+                }
+                snd_store_cycles += cycles-old_cycles;
+                if (snd_store_cycles > 1000) {
+                    XFF00 = channel_clocker(1000, XFF00);
+                    snd_store_cycles -= 1000;
                 }
                 if (stopped) {
                     return;
@@ -5067,7 +5073,7 @@ function timing_handler(cyc_run) {
         //draw(XFF00, read);
 
         //cpu_timestamp = new Date();
-        console.log(/*cpu_timestamp.getTime() + */" : frame " + frames);
+        //console.log(/*cpu_timestamp.getTime() + */" : frame " + frames);
     } else {
         console.log("Waiting for key press...");
     }
@@ -5082,7 +5088,7 @@ function beginLoop() {
 function endLoop() {
     clearInterval(loop);
     quit = true;
-    //stop_all();
+    stop_all_sound();
 }
 
 let zed = 0;

@@ -631,3 +631,5 @@ relinquish_control = function() {
 };
 
 seize_control();
+
+console.log("Detonation up and ready!");
