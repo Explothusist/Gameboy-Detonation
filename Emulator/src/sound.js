@@ -2,17 +2,93 @@
 let sound = document.getElementById("sound");
 let speed = document.getElementById("speed");
 
+let square_1_source_node;
+let square_2_source_node;
+let wave_table_amplifier;
+let wave_table_source_node;
+let noise_source_node;
+let square_1_splitter;
+let square_2_splitter;
+let wave_table_splitter;
+let noise_splitter;
+let left_squares_merger;
+let right_squares_merger;
+let left_others_merger;
+let right_others_merger;
+let left_squares_converter;
+let right_squares_converter;
+let left_others_converter;
+let right_others_converter;
+let left_merger;
+let right_merger;
+let left_converter;
+let right_converter;
+let main_merger;
 let audio_ctx;
 let sound_enabled = false;
-let audio_merger;
+// let audio_merger;
 
 sound.onclick = function () {
     audio_ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000 });
 
     // Create an empty three-second stereo buffer at the sample rate of the AudioContext
     const myArrayBuffer = audio_ctx.createBuffer(2, audio_ctx.sampleRate * 0.25, audio_ctx.sampleRate);
-    audio_merger = audio_ctx.createChannelMerger(4);
-    audio_merger.connect(audio_ctx.destination);
+    // audio_merger = audio_ctx.createChannelMerger();
+    // audio_merger.connect(audio_ctx.destination);
+
+    square_1_splitter = audio_ctx.createChannelSplitter();
+    square_2_splitter = audio_ctx.createChannelSplitter();
+    wave_table_amplifier = audio_ctx.createGain();
+    wave_table_splitter = audio_ctx.createChannelSplitter();
+    noise_splitter = audio_ctx.createChannelSplitter();
+
+    left_squares_merger = audio_ctx.createChannelMerger(2);
+    right_squares_merger = audio_ctx.createChannelMerger(2);
+    left_others_merger = audio_ctx.createChannelMerger(2);
+    right_others_merger = audio_ctx.createChannelMerger(2);
+
+    left_squares_converter = audio_ctx.createChannelMerger(1);
+    right_squares_converter = audio_ctx.createChannelMerger(1);
+    left_others_converter = audio_ctx.createChannelMerger(1);
+    right_others_converter = audio_ctx.createChannelMerger(1);
+
+    left_merger = audio_ctx.createChannelMerger(2);
+    right_merger = audio_ctx.createChannelMerger(2);
+
+    left_converter = audio_ctx.createChannelMerger(1);
+    right_converter = audio_ctx.createChannelMerger(1);
+
+    main_merger = audio_ctx.createChannelMerger(2);
+
+    wave_table_amplifier.gain.setValueAtTime(1, audio_ctx.currentTime);
+    wave_table_amplifier.connect(wave_table_splitter);
+
+    square_1_splitter.connect(left_squares_merger, 1, 1);
+    square_1_splitter.connect(right_squares_merger, 2, 1);
+    square_2_splitter.connect(left_squares_merger, 1, 1);
+    square_2_splitter.connect(right_squares_merger, 2, 1);
+    wave_table_splitter.connect(left_others_merger, 1, 1);
+    wave_table_splitter.connect(right_others_merger, 2, 1);
+    noise_splitter.connect(left_others_merger, 1, 1);
+    noise_splitter.connect(right_others_merger, 2, 1);
+
+    left_squares_merger.connect(left_squares_converter);
+    right_squares_merger.connect(right_squares_converter);
+    left_others_merger.connect(left_others_converter);
+    right_others_merger.connect(right_others_converter);
+
+    left_squares_converter.connect(left_merger);
+    left_others_converter.connect(left_merger);
+    right_squares_converter.connect(right_merger);
+    right_others_converter.connect(right_merger);
+
+    left_merger.connect(left_converter);
+    right_merger.connect(right_converter);
+
+    left_converter.connect(main_merger);
+    right_converter.connect(main_merger);
+
+    main_merger.connect(audio_ctx.destination);
 
     // Fill the buffer with white noise;
     // just random values between -1.0 and 1.0
@@ -36,7 +112,7 @@ sound.onclick = function () {
 
     // connect the AudioBufferSourceNode to the
     // destination so we can hear the sound
-    source.connect(audio_merger);
+    source.connect(square_1_splitter);
 
     // start the source playing
     source.start();
@@ -57,19 +133,16 @@ let watchdog_ms_per_cycle = 4.8e-7;
 let half_ms = true;
 
 
-let square_1_source_node;
 let square_1_buffer;
 let square_1_buffer_left_data;
 let square_1_buffer_right_data;
 let square_1_buffer_pos = -1;
 
-let square_2_source_node;
 let square_2_buffer;
 let square_2_buffer_left_data;
 let square_2_buffer_right_data;
 let square_2_buffer_pos = -1;
 
-let wave_table_source_node;
 let wave_table_buffer;
 let wave_table_buffer_left_data;
 let wave_table_buffer_right_data;
@@ -367,7 +440,9 @@ function TriggerAudioChannel(channel) {
             console.log("SqWv1 Audio Setup, frequency: "+square_1.frequency+", duty: "+square_1.duty);
             square_1_source_node = audio_ctx.createBufferSource();
             square_1_source_node.buffer = square_1_buffer;
-            square_1_source_node.connect(audio_merger);
+            // square_1_source_node.connect(audio_merger);
+            // square_1_source_node.connect(audio_ctx.destination);
+            square_1_source_node.connect(square_1_splitter);
             square_1_source_node.start();
             square_1.started = true;
             break;
@@ -379,7 +454,9 @@ function TriggerAudioChannel(channel) {
             console.log("SqWv2 Audio Setup, frequency: "+square_2.frequency+", duty: "+square_2.duty);
             square_2_source_node = audio_ctx.createBufferSource();
             square_2_source_node.buffer = square_2_buffer;
-            square_2_source_node.connect(audio_merger);
+            // square_2_source_node.connect(audio_merger);
+            // square_2_source_node.connect(audio_ctx.destination);
+            square_2_source_node.connect(square_2_splitter);
             square_2_source_node.start();
             square_2.started = true;
             break;
@@ -391,7 +468,9 @@ function TriggerAudioChannel(channel) {
             console.log("WvTbl Audio Setup, frequency: "+wave_table.frequency+", duty: "+wave_table.duty);
             wave_table_source_node = audio_ctx.createBufferSource();
             wave_table_source_node.buffer = wave_table_buffer;
-            wave_table_source_node.connect(audio_merger);
+            // wave_table_source_node.connect(audio_merger);
+            // wave_table_source_node.connect(audio_ctx.destination);
+            wave_table_source_node.connect(wave_table_amplifier);
             wave_table_source_node.start();
             wave_table.started = true;
             break;
@@ -563,7 +642,10 @@ let store_cycles = 0;
 let cycle_cuttoff = 7000000; // just under 100 frames
 let watchdog_cuttoff = 1000000; // just under 100 frames
 
-let initial_buffer = 300;
+let initial_buffer = 200;
+let old_time_precise = 0;
+
+let sound_by_ms = true; // system ms vs CPU cycles
 
 function channel_clocker(cycles, XFF) {
     if (sound_enabled) {
@@ -615,13 +697,20 @@ function channel_clocker(cycles, XFF) {
             old_time = audio_ctx.currentTime;
         }
 
-        // Generate sound faster when running slow so that frequencies
-        // do not change.
-        cycles *= (ms_per_cycle/full_speed)*1.05;
+        if (sound_by_ms) {
+            if (old_time_precise !== 0) {
+                cycles = (audio_ctx.currentTime-old_time_precise)*(1/full_speed)*1.05;
+            }
+            old_time_precise = audio_ctx.currentTime;
+        }else {
+            // Generate sound faster when running slow so that frequencies
+            // do not change.
+            cycles *= (ms_per_cycle/full_speed)*1.05;
+        }
 
         // Square Wave 1
         square_1.cycles += cycles;
-        if (square_1.cycles > (2048-square_1.frequency)*4) {
+        while (square_1.cycles > (2048-square_1.frequency)*4) {
             square_1.cycles -= (2048-square_1.frequency)*4;
             square_1.clock_tick += 1;
             square_1.clock_tick &= 0b111;
@@ -643,7 +732,7 @@ function channel_clocker(cycles, XFF) {
 
         // Square Wave 2
         square_2.cycles += cycles;
-        if (square_2.cycles > (2048-square_2.frequency)*4) {
+        while (square_2.cycles > (2048-square_2.frequency)*4) {
             square_2.cycles -= (2048-square_2.frequency)*4;
             square_2.clock_tick += 1;
             square_2.clock_tick &= 0b111;
@@ -664,7 +753,7 @@ function channel_clocker(cycles, XFF) {
         }
         
         wave_table.cycles += cycles;
-        if (wave_table.cycles > (2048-wave_table.frequency)*2) {
+        while (wave_table.cycles > (2048-wave_table.frequency)*2) {
             wave_table.cycles -= (2048-square_2.frequency)*2;
             wave_table.clock_tick += 1;
             wave_table.clock_tick &= 0b1_1111;
