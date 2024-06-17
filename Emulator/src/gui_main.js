@@ -382,6 +382,18 @@ function load_ram_data(ram) {
     XA000 = rambanks[rambank];
 };
 function save_current_RAM() {
+    let any_non_zero = false;
+    for (let i = 0; i < m_ram.length; i++) {
+        if (m_ram[i] !== 0) {
+            any_non_zero = true;
+        }
+    }
+    console.log(any_non_zero);
+    if (!any_non_zero) {
+        ram_not_trusted = true;
+        console.log("RAM Data read as blank for unknown reason. Autosave disabled until RAM is saved manually. If you do not know why the RAM is blank, reload the page and try again");
+        alert("RAM Data read as blank for unknown reason. Autosave disabled until RAM is saved manually. If you do not know why the RAM is blank, reload the page and try again");
+    }
     if (!ram_not_trusted) {
         let to_save = [];
         rambanks[pram] = XA000;
