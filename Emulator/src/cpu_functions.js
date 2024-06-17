@@ -4972,14 +4972,14 @@ function timing_handler(cyc_run) {
                     cycles += 160;
                     dma = 0;
                 }
-                if (cycles > sound_timer) {
-                    sound_timer += 8183.59375;
-                    XFF00 = frame_sequencer(XFF00);
-                }
                 snd_store_cycles += cycles-old_cycles;
-                if (snd_store_cycles > 1000) {
-                    XFF00 = channel_clocker(1000, XFF00);
-                    snd_store_cycles -= 1000;
+                if (snd_store_cycles > 1024) {
+                    XFF00 = channel_clocker(1024, XFF00);
+                    snd_store_cycles -= 1024;
+                }
+                if (cycles > sound_timer) {
+                    sound_timer += 8192;
+                    XFF00 = frame_sequencer(XFF00);
                 }
                 if (stopped) {
                     return;

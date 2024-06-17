@@ -98,6 +98,8 @@ function setup_register_rom() {};
 function setup_keybindings() {};
 function setup_edit_game() {};
 function setup_select_game() {};
+function setup_writing_file() {};
+function setup_reading_file() {};
 // Actions
 function open_directory() {};
 function get_all_files() {};
@@ -173,6 +175,9 @@ let numbers = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"];
 
 let new_rom = undefined;
 let new_game = {};
+let ram_size = 1;
+
+let ram_not_trusted = false;
 
 let RAMFileHandle;
 
@@ -262,8 +267,15 @@ setup_keybindings = function(selected=0) {
         [{bind_to: 0}, {bind_to: 1}, {bind_to: 2}, {bind_to: 3}, {bind_to: 4}, {bind_to: 5}, {bind_to: 6}, {bind_to: 7}, {none:true}, {none:true}]);
     m_menu.selected = selected;
 };
+setup_writing_file = function() {
+    m_menu = new Menu("Writing file, please wait.\nThis may take a while.", [], [], []);
+};
+setup_reading_file = function() {
+    m_menu = new Menu("Reading files, please wait.\nThis may take a while.", [], [], []);
+};
 
 open_directory = function() {
+    // setup_reading_file();
     onDirectoryFileHandleLoad = function(handle) {
         DirectoryHandle = handle;
         get_all_files();
@@ -284,7 +296,6 @@ get_all_files = function() {
 //         data_dir_files = files;
 //         read_directory();
 //         setup_main_menu();
-//         console.log(data_dir_files);
 //     };
 //     FileHandlesToFiles(data_dir_fileHandles);
 // };
@@ -345,9 +356,24 @@ function read_romname(rom) {
     }
     romname = new_name;
 };
+function read_ram_size(rom) {
+    let ram_size = rom[0x149];
+    switch (ram_size) {
+        case 0:
+            return 0;
+        case 1:
+            return 1;
+        case 2:
+            return 1;
+        case 3:
+            return 4;
+        case 4:
+            return 16;
+    }
+};
 function load_ram_data(ram) {
     let counter = 0;
-    for (let i = 0; i < 16; i++) {
+    for (let i = 0; i < ram_size; i++) {
         for (var j = 0; j < rambanks[i].length; j++) {
             rambanks[i][j] = ram[counter];
             counter += 1;
@@ -356,12 +382,14 @@ function load_ram_data(ram) {
     XA000 = rambanks[rambank];
 };
 function save_current_RAM() {
-    let to_save = [];
-    rambanks[pram] = XA000;
-    for (let i = 0; i < rambanks.length; i++) {
-        to_save.push(rambanks[i]);
+    if (!ram_not_trusted) {
+        let to_save = [];
+        rambanks[pram] = XA000;
+        for (let i = 0; i < Math.min(rambanks.length, ram_size); i++) {
+            to_save.push(rambanks[i]);
+        }
+        writeFile(RAMFileHandle, to_save);
     }
-    writeFile(RAMFileHandle, to_save);
 };
 load_game = function(args) {
     // alert("Select "+registered_games[args.game_id].ram_path+" in /Emulator Data/Save_RAM/");
@@ -371,6 +399,7 @@ load_game = function(args) {
     //     save_current_RAM();
     //     load_game_pt2(args);
     // };
+    setup_reading_file();
     onFileFromDirLoad = function(fileHandle) {
         RAMFileHandle = fileHandle;
         save_current_RAM();
@@ -383,10 +412,11 @@ load_game_pt2 = function(args) {
 
     rom_path = registered_games[args.game_id].rom_path;
     ram_path = registered_games[args.game_id].ram_path;
+    ram_size = registered_games[args.game_id].ram_size;
     let rom_file = get_file(rom_path);
     let ram_file = get_file(ram_path);
 
-    let rom_reader = new FileReader();
+    const rom_reader = new FileReader();
     rom_reader.onload = function () {
         m_rom = new Uint8Array(this.result);
         read_romname(m_rom);
@@ -399,7 +429,20 @@ load_game_pt2 = function(args) {
     const ram_reader = new FileReader();
     ram_reader.onload = function () {
         m_ram = new Uint8Array(this.result);
-        load_ram_data(m_ram);
+        let any_non_zero = false;
+        for (let i = 0; i < m_ram.length; i++) {
+            if (m_ram[i] !== 0) {
+                any_non_zero = true;
+            }
+        }
+        console.log(any_non_zero);
+        if (any_non_zero) {
+            load_ram_data(m_ram);
+        }else {
+            ram_not_trusted = true;
+            console.log("RAM Data read as blank for unknown reason. Autosave disabled until RAM is saved manually. If you do not know why the RAM is blank, reload the page and try again");
+            alert("RAM Data read as blank for unknown reason. Autosave disabled until RAM is saved manually. If you do not know why the RAM is blank, reload the page and try again");
+        }
         ram_ready = true;
         start_game();
     };
@@ -415,6 +458,7 @@ start_game = function() {
     }
 };
 select_rom = function() {
+    setup_reading_file();
     onROMload = function(file) {
         new_rom = file;
         select_rom_pt2();
@@ -425,7 +469,7 @@ select_rom_pt2 = function() {
     if (new_rom != undefined) {
         let rom_reader = new FileReader();
         rom_reader.onload = function () {
-            new_game = {name: "", rom_path: new_rom.name, ram_path:  "", save_state: ["", "", "", "",]};
+            new_game = {name: "", rom_path: new_rom.name, ram_path:  "", save_state: ["", "", "", "",], ram_size: 1};
             new_rom = new Uint8Array(this.result);
             read_romname(new_rom);
             m_menu.entries[1] = "Name: "+romname;
@@ -435,6 +479,7 @@ select_rom_pt2 = function() {
             new_game.save_state[2] = romname+"_3.bgstate";
             new_game.save_state[3] = romname+"_4.bgstate";
             new_game.name = romname;
+            new_game.ram_size = read_ram_size(new_rom);
         };
         rom_reader.readAsArrayBuffer(new_rom);
     }
@@ -447,6 +492,7 @@ add_registered_game = function() {
         //     add_registered_game_pt2();
         // };
         // saveROM([new_rom]);
+        setup_writing_file();
         saveInDirectoryComplete = function() {
             add_registered_game_pt2();
         };
@@ -466,7 +512,7 @@ add_registered_game_pt2 = function() {
         saveInDirectoryComplete = function() {
             add_registered_game_pt3();
         };
-        createFileInDirectory(DirectoryHandle, "Save_RAM", new_game.ram_path, new Uint8Array(0x2000 * 16));
+        createFileInDirectory(DirectoryHandle, "Save_RAM", new_game.ram_path, new Uint8Array(0x2000 * new_game.ram_size));
     }else {
         add_registered_game_pt3();
     }
@@ -483,8 +529,9 @@ add_registered_game_pt3 = function() {
     // alert("Select registered_games.txt in /Emulator Data/Emulator Settings/");
     // onSaveEnd = function() {};
     // saveText(to_save);
-    setup_main_menu();
-    saveInDirectoryComplete = function() {};
+    saveInDirectoryComplete = function() {
+        setup_main_menu();
+    };
     saveToFileInDirectory(DirectoryHandle, "Emulator Settings", "registered_games.txt", to_save);
 };
 forget_all = function() {
@@ -492,6 +539,7 @@ forget_all = function() {
     // alert("Select registered_games.txt in /Emulator Data/Emulator Settings/");
     // onSaveEnd = function() {};
     // saveText("");
+    setup_writing_file();
     saveInDirectoryComplete = function() {};
     saveToFileInDirectory(DirectoryHandle, "Emulator Settings", "registered_games.txt", "");
 };
@@ -507,17 +555,21 @@ forget_game = function(args) {
         }
     }
     // saveText(to_save);
-    setup_main_menu();
-    saveInDirectoryComplete = function() {};
+    setup_writing_file();
+    saveInDirectoryComplete = function() {
+        setup_main_menu();
+    };
     saveToFileInDirectory(DirectoryHandle, "Emulator Settings", "registered_games.txt", to_save);
 };
 wipe_game_ram = function(args) {
     // alert("Select "+registered_games[args.game_id].ram_path+" in /Emulator Data/Save_RAM/");
     // onSaveEnd = function() {};
     // saveRAM(new Uint8Array(0x2000 * 16));
-    setup_main_menu();
-    saveInDirectoryComplete = function() {};
-    saveToFileInDirectory(DirectoryHandle, "Save_RAM", registered_games[args.game_id].ram_path, new Uint8Array(0x2000 * 16));
+    setup_writing_file();
+    saveInDirectoryComplete = function() {
+        setup_main_menu();
+    };
+    saveToFileInDirectory(DirectoryHandle, "Save_RAM", registered_games[args.game_id].ram_path, new Uint8Array(0x2000 * ram_size));
 };
 let bind_slot = 0;
 trigger_set_keybind = function(args) {
@@ -540,8 +592,10 @@ save_keybinds = function() {
     }
     // alert("Select keybindings.txt in /Emulator Data/Emulator Settings/");
     // saveText(to_save);
-    setup_main_menu();
-    saveInDirectoryComplete = function() {};
+    setup_writing_file();
+    saveInDirectoryComplete = function() {
+        setup_main_menu();
+    };
     saveToFileInDirectory(DirectoryHandle, "Emulator Settings", "keybindings.txt", to_save);
 };
 
@@ -552,7 +606,7 @@ begin.onclick = function () {
             go = 3;
             begin.innerHTML = "Pause";
             beginLoop();
-            save_loop = setInterval(save_current_RAM, 5000);
+            save_loop = setInterval(save_current_RAM, 10000);
         } else if (go === 3) {
             go = 2;
             begin.innerHTML = "Resume";
@@ -570,6 +624,7 @@ reset.onclick = function () {
 };
 saveram.onclick = function() {
     if (!gui_has_control) {
+        ram_not_trusted = false;
         save_current_RAM();
     }
 };

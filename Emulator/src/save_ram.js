@@ -104,7 +104,6 @@ async function* getFilesRecursively(entry) {
 async function getAllFileHandle(directoryHandle) {
     let fileHandles = [];
     for await (const fileHandle of getFilesRecursively(directoryHandle)) {
-        console.log(fileHandle);
         fileHandles.push(fileHandle);
     }
     onAllFileHandleLoad(fileHandles);
@@ -125,9 +124,13 @@ async function onFileHandlesToFilesLoad(files) {
 };
 
 async function saveToFileInDirectory(directoryHandle, directory, filename, contents) {
+    console.log("Finding directory...");
     let SubDirectory = await directoryHandle.getDirectoryHandle(directory);
+    console.log("Finding file...");
     let fileHandle = await SubDirectory.getFileHandle(filename);
+    console.log("Writing file...");
     await writeFile(fileHandle, contents);
+    console.log("Write complete!");
     saveInDirectoryComplete();
 };
 async function createFileInDirectory(directoryHandle, directory, filename, contents) {
