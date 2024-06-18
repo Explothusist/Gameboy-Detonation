@@ -76,6 +76,9 @@ let square_2_enable_written = false;
 let wave_table_enable_written = false;
 let noise_enable_written = false;
 
+let cart_rom_size = 0;
+let cart_ram_size = 0;
+
 function memory_reset() {
     XFFFF = 0; // Interrupt Enable register
     XFF80 = new Uint8Array(0x7f); // HRAM
@@ -90,8 +93,8 @@ function memory_reset() {
 
 function setup(rom) {
     car_type = rom[0x147];
-    let rom_size = rom[0x148];
-    let ram_size = rom[0x149];
+    cart_rom_size = rom[0x148];
+    cart_ram_size = rom[0x149];
     let offset = 0;
     //console.log("Cartridge Type: " + car_type.toString(16));
     //console.log("ROM Size: " + rom_size.toString(16));
@@ -100,7 +103,7 @@ function setup(rom) {
         alert("Color GameBoy Cartridge: Cannot be run.");
         //return;
     }
-    switch (rom_size) {
+    switch (cart_rom_size) {
         case 0:
             //2 bank
             for (let i = 0; i < 0x4000; i++) {
@@ -110,8 +113,7 @@ function setup(rom) {
             for (let i = 0; i < 0x4000; i++) {
                 X4000[i] = rom[i + offset];
             }
-            offset += 0x4000;
-            //console.log("2 bank ROM");
+            console.log("2 bank ROM");
             break;
         case 1:
             //4 bank
@@ -119,20 +121,15 @@ function setup(rom) {
                 X0000[i] = rom[i];
             }
             offset += 0x4000;
-            for (let i = 0; i < 0x4000; i++) {
-                rombanks[1][i] = rom[i + offset];
+            for (let j = 1; j < 4; j++) {
+                for (let i = 0; i < 0x4000; i++) {
+                    rombanks[j][i] = rom[i + offset];
+                }
+                offset += 0x4000;
             }
-            offset += 0x4000;
-            for (let i = 0; i < 0x4000; i++) {
-                rombanks[2][i] = rom[i + offset];
-            }
-            offset += 0x4000;
-            for (let i = 0; i < 0x4000; i++) {
-                rombanks[3][i] = rom[i + offset];
-            }
-            offset += 0x4000;
             X4000 = rombanks[1];
-            //console.log("4 bank ROM");
+			
+            console.log("4 bank ROM");
             break;
         case 2:
             //8 bank
@@ -140,35 +137,15 @@ function setup(rom) {
                 X0000[i] = rom[i];
             }
             offset += 0x4000;
-            for (let i = 0; i < 0x4000; i++) {
-                rombanks[1][i] = rom[i + offset];
+            for (let j = 1; j < 8; j++) {
+                for (let i = 0; i < 0x4000; i++) {
+                    rombanks[j][i] = rom[i + offset];
+                }
+                offset += 0x4000;
             }
-            offset += 0x4000;
-            for (let i = 0; i < 0x4000; i++) {
-                rombanks[2][i] = rom[i + offset];
-            }
-            offset += 0x4000;
-            for (let i = 0; i < 0x4000; i++) {
-                rombanks[3][i] = rom[i + offset];
-            }
-            offset += 0x4000;
-            for (let i = 0; i < 0x4000; i++) {
-                rombanks[4][i] = rom[i + offset];
-            }
-            offset += 0x4000;
-            for (let i = 0; i < 0x4000; i++) {
-                rombanks[5][i] = rom[i + offset];
-            }
-            offset += 0x4000;
-            for (let i = 0; i < 0x4000; i++) {
-                rombanks[6][i] = rom[i + offset];
-            }
-            for (let i = 0; i < 0x4000; i++) {
-                rombanks[7][i] = rom[i + offset];
-            }
-            offset += 0x4000;
             X4000 = rombanks[1];
-            //console.log("8 bank ROM");
+			
+            console.log("8 bank ROM");
             break;
         case 3:
             //16 bank
@@ -183,7 +160,8 @@ function setup(rom) {
                 offset += 0x4000;
             }
             X4000 = rombanks[1];
-            //console.log("16 bank ROM");
+			
+            console.log("16 bank ROM");
             break;
         case 4:
             //32 bank
@@ -198,7 +176,8 @@ function setup(rom) {
                 offset += 0x4000;
             }
             X4000 = rombanks[1];
-            //console.log("32 bank ROM");
+			
+            console.log("32 bank ROM");
             break;
         case 5:
             //64 bank
@@ -213,7 +192,8 @@ function setup(rom) {
                 offset += 0x4000;
             }
             X4000 = rombanks[1];
-            //console.log("64 bank ROM");
+			
+            console.log("64 bank ROM");
             break;
         case 6:
             //128 bank
@@ -228,7 +208,8 @@ function setup(rom) {
                 offset += 0x4000;
             }
             X4000 = rombanks[1];
-            //console.log("128 bank ROM");
+			
+            console.log("128 bank ROM");
             break;
         case 0x52:
             //72 bank
@@ -243,7 +224,8 @@ function setup(rom) {
                 offset += 0x4000;
             }
             X4000 = rombanks[1];
-            //console.log("72 bank ROM");
+			
+            console.log("72 bank ROM");
             break;
         case 0x53:
             //80 bank
@@ -258,7 +240,8 @@ function setup(rom) {
                 offset += 0x4000;
             }
             X4000 = rombanks[1];
-            //console.log("80 bank ROM");
+			
+            console.log("80 bank ROM");
             break;
         case 0x54:
             //96 bank
@@ -273,31 +256,32 @@ function setup(rom) {
                 offset += 0x4000;
             }
             X4000 = rombanks[1];
-            //console.log("96 bank ROM");
+			
+            console.log("96 bank ROM");
             break;
         default:
             alert("ERROR: invalid ROM size");
     }
-    switch (ram_size) {
+    switch (cart_ram_size) {
         case 0:
             //None
-            //console.log("No RAM");
+            console.log("No RAM");
             break;
         case 1:
             //1 bank
-            //console.log("1 bank RAM");
+            console.log("1 bank RAM");
             break;
         case 2:
             //1 bank
-            //console.log("1 bank RAM");
+            console.log("1 bank RAM");
             break;
         case 3:
             //4 bank
-            //console.log("4 bank RAM");
+            console.log("4 bank RAM");
             break;
         case 4:
             //16 bank
-            //console.log("16 bank RAM");
+            console.log("16 bank RAM");
             break;
         default:
             alert("ERROR: invalid RAM size");
@@ -306,119 +290,119 @@ function setup(rom) {
         case 0:
             //ROM Only
             car_type = 0;
-            //console.log("ROM Only");
+            console.log("ROM Only");
             break;
         case 1:
             //ROM+MBC1
             car_type = 1;
-            //console.log("ROM + MBC1");
+            console.log("ROM + MBC1");
             break;
         case 2:
             //ROM+MBC1+RAM
             car_type = 1;
-            //console.log("ROM + MBC1 + RAM");
+            console.log("ROM + MBC1 + RAM");
             break;
         case 3:
             //ROM+MBC1+RAM+BATT
             car_type = 1;
             batt = 1;
-            //console.log("ROM + MBC1 + RAM + BATT");
+            console.log("ROM + MBC1 + RAM + BATT");
             break;
         case 5:
             //ROM+MBC2
             car_type = 2;
-            //console.log("ROM + MBC2");
+            console.log("ROM + MBC2");
             break;
         case 6:
             //ROM+MBC2+BATT
             car_type = 2;
             batt = 1;
-            //console.log("ROM + MBC2 + BATT");
+            console.log("ROM + MBC2 + BATT");
             break;
         case 8:
             //ROM+RAM
             car_type = 0;
-            //console.log("ROM + RAM");
+            console.log("ROM + RAM");
             break;
         case 9:
             //ROM+RAM+BATT
             car_type = 0;
             batt = 1;
-            //console.log("ROM + RAM + BATT");
+            console.log("ROM + RAM + BATT");
             break;
         case 0xb:
             //ROM+MMMO1
             car_type = 2;
-            //console.log("ROM + MMM01");
+            console.log("ROM + MMM01");
             break;
         case 0xc:
             //ROM+MMMO1+SRAM
             car_type = 2;
             sram = 1;
-            //console.log("ROM + MMM01 + SRAM");
+            console.log("ROM + MMM01 + SRAM");
             break;
         case 0xd:
             //ROM+MMMO1+SRAM+BATT
             car_type = 2;
             sram = 1;
             batt = 1;
-            //console.log("ROM + MMM01 + SRAM + BATT");
+            console.log("ROM + MMM01 + SRAM + BATT");
             break;
         case 0xf:
             //ROM+MBC3+TIMER+BATT
             car_type = 3;
             batt = 1;
-            //console.log("ROM + MBC3 + TIMER + BATT");
+            console.log("ROM + MBC3 + TIMER + BATT");
             break;
         case 0x10:
             //ROM+MBC3+TIMER+RAM+BATT
             car_type = 3;
             batt = 1;
-            //console.log("ROM + MBC3 + TIMER + RAM + BATT");
+            console.log("ROM + MBC3 + TIMER + RAM + BATT");
             break;
         case 0x11:
             //ROM+MBC3
             car_type = 3;
-            //console.log("ROM + MBC3");
+            console.log("ROM + MBC3");
             break;
         case 0x12:
             //ROM+MCB3+RAM
             car_type = 3;
-            //console.log("ROM + MBC3 + RAM");
+            console.log("ROM + MBC3 + RAM");
             break;
         case 0x13:
             //ROM+MCB3+RAM+BATT
             car_type = 3;
             batt = 1;
-            //console.log("ROM + MBC3 + RAM + BATT");
+            console.log("ROM + MBC3 + RAM + BATT");
             break;
         case 0x19:
             //ROM+MCB5
             car_type = 5;
-            //console.log("ROM + MBC5");
+            console.log("ROM + MBC5");
             break;
         case 0x1a:
             //ROM+MCB5+RAM
             car_type = 5;
-            //console.log("ROM + MBC5 + RAM");
+            console.log("ROM + MBC5 + RAM");
             break;
         case 0x1b:
             //ROM+MCB5+RAM+BATT
-            //console.log("ROM + MBC5 + RAM + BATT");
+            console.log("ROM + MBC5 + RAM + BATT");
             car_type = 5;
             break;
         case 0x1c:
             //ROM+MCB5+RUMBLE
             car_type = 5;
             rumble = 1;
-            //console.log("ROM + MBC5 + RUMBLE");
+            console.log("ROM + MBC5 + RUMBLE");
             break;
         case 0x1d:
             //ROM+MCB5+RUMBLE+SRAM
             car_type = 5;
             rumble = 1;
             sram = 1;
-            //console.log("ROM + MBC5 + RUMBLE + SRAM");
+            console.log("ROM + MBC5 + RUMBLE + SRAM");
             break;
         case 0x1e:
             //ROM+MCB5+RUMBLE+SRAM+BATT
@@ -426,7 +410,7 @@ function setup(rom) {
             rumble = 1;
             sram = 1;
             batt = 1;
-            //console.log("ROM + MBC5 + RUMBLE + SRAM + BATT");
+            console.log("ROM + MBC5 + RUMBLE + SRAM + BATT");
             break;
         case 0x1f:
             //Pocket Camera
@@ -448,9 +432,9 @@ function setup(rom) {
             alert("ERROR: invalid RAM size");
     }
 
-    if (car_type === 5) {
-        rombanks[0] = X0000;
-    }
+    // if (car_type === 5) {
+    rombanks[0] = X0000;
+    // }
 }
 
 
@@ -614,6 +598,9 @@ function write(pos, val, message = 1) {
                     if (rombank === 0) {
                         rombank = 1;
                     }
+                    if (cart_rom_size < 4) {
+                        rombank &= (0b0001_1111 >> (4-cart_rom_size));
+                    }
                     let bank = rombank + (romhigh << 5);
                     X4000 = rombanks[bank];
                     ////console.log("ROM bank changed to bank " + bank);
@@ -624,43 +611,51 @@ function write(pos, val, message = 1) {
                     return;
                 } else if (pos < 0x6000) {
                     if (mem_mode === 0) {
-                        romhigh = val & 0b0000_0011;
-                        let bank = rombank + (romhigh << 5);
-                        X4000 = rombanks[bank];
-                        //console.log("ROM bank changed to bank " + bank);
-                        alert("ROM bank high changed!");
-                        //mem_abort = true;
+                        if (cart_rom_size > 4) {
+                            romhigh = val & 0b0000_0011;
+                            let mod_rom_high = romhigh;
+                            if (cart_rom_size < 6) {
+                                mod_rom_high &= (0b11 >> (6-cart_rom_size));
+                            }
+                            let bank = rombank + (mod_rom_high << 5);
+                            X4000 = rombanks[bank];
+                            //console.log("ROM bank changed to bank " + bank);
+                            alert("ROM bank high changed!");
+                            //mem_abort = true;
+                        }
                         return;
                     } else if (mem_mode === 1) {
-                        rambank = val & 0b0000_0011;
-                        rambanks[pram] = XA000;
-                        XA000 = rambanks[rambank];
-                        pram = rambank;
-                        //console.log("RAM bank changed to bank " + rambank);
+                        if (cart_ram_size > 2) {
+                            rambank = val & 0b0000_0011;
+                            rambanks[pram] = XA000;
+                            XA000 = rambanks[rambank];
+                            pram = rambank;
+                            //console.log("RAM bank changed to bank " + rambank);
+                        }
                         return;
                     }
                 } else if (pos < 0x8000) {
                     mem_mode = val & 0b0000_0001;
                     if (mem_mode === 0) {
                         romhigh = rambank;
+                        let mod_rom_high = romhigh;
+                        if (cart_rom_size < 6) {
+                            mod_rom_high &= (0b11 >> (6-cart_rom_size));
+                        }
                         rambanks[pram] = XA000;
                         XA000 = rambanks[0];
                         pram = 0;
-                        let bank = rombank + (romhigh << 5);
-                        if (bank === 0) {
-                            bank = 1;
-                        }
+                        let bank = rombank + (mod_rom_high << 5);
                         X4000 = rombanks[bank];
                     } else if (mem_mode === 1) {
                         rambank = romhigh;
                         rambanks[0] = XA000;
-                        XA000 = rambanks[rambank];
-                        pram = rambank;
+                        if (cart_ram_size > 2) {
+                            XA000 = rambanks[rambank];
+                            pram = rambank;
+                        }
                         romhigh = 0;
                         let bank = rombank + (romhigh << 5);
-                        if (bank === 0) {
-                            bank = 1;
-                        }
                         X4000 = rombanks[bank];
                     }
                     if (dump === 1) {
@@ -670,28 +665,29 @@ function write(pos, val, message = 1) {
                 }
                 break;
             case 2:
-                if (pos < 0x2000) {
-                    if (dump === 1) {
-                        if ((pos & 0b1_0000_0000) >> 8 !== 0) {
-                            //console.log("Invalid address to change RAM bank");
+                if (pos < 0x4000) {
+                    if ((pos & 0b1_0000_0000) >> 8 === 0) {
+                        if (dump === 1) {
+                            if ((val & 0b0000_1111) === 0b1010) {
+                                //console.log("RAM bank activated");
+                            } else {
+                                //console.log("RAM bank deactivated");
+                            }
                         }
-                        if ((val & 0b0000_1111) === 0b1010) {
-                            //console.log("RAM bank activated");
-                        } else {
-                            //console.log("RAM bank deactivated");
+                    }else {
+                        if ((pos & 0b1_0000_0000) >> 8 !== 1) {
+                            //console.log("Invalid address to change ROM bank");
                         }
+                        rombank = val & 0b0000_1111;
+                        if (rombank === 0) {
+                            rombank = 1;
+                        }
+                        if (cart_rom_size < 3) {
+                            rombank &= (0b0000_1111 >> (3-cart_rom_size));
+                        }
+                        X4000 = rombanks[rombank];
+                        //console.log("ROM bank changed to bank " + rombank);
                     }
-                    return;
-                } else if (pos < 0x4000) {
-                    if ((pos & 0b1_0000_0000) >> 8 !== 1) {
-                        //console.log("Invalid address to change ROM bank");
-                    }
-                    rombank = val & 0b0000_1111;
-                    if (rombank === 0) {
-                        rombank = 1;
-                    }
-                    X4000 = rombanks[rombank];
-                    //console.log("ROM bank changed to bank " + rombank);
                     return;
                 }
                 break;
@@ -710,22 +706,28 @@ function write(pos, val, message = 1) {
                     if (rombank === 0) {
                         rombank = 1;
                     }
+                    if (cart_rom_size < 6) {
+                        rombank &= (0b0111_1111 >> (6-cart_rom_size));
+                    }
                     X4000 = rombanks[rombank];
                     //console.log("ROM bank changed to bank " + rombank);
                     return;
                 } else if (pos < 0x6000) {
-                    if ((val & 0b1111) <= 7) {
-                        rambank = val & 0b0000_0111;
+                    if ((val & 0b1111) <= 3) {
+                        rambank = val & 0b0000_0011;
                         XA000 = rambanks[rambank];
                         rtc_mode = -1;
                         //console.log("RAM bank changed to bank " + rambank);
-                    } else if ((val & 0b1111) <= 0xc) {
+                    } else if ((val & 0b1111) >= 0x8 && (val & 0b1111) <= 0xc) {
                         rtc_mode = val & 0b1111;
                         //console.log("RTC set to 0x" + rtc_mode.toString(16));
                     }
                     return;
                 } else if (pos < 0x8000) {
-                    mem_mode = val & 0b0000_0001;
+                    rtc_latched = val & 0b0000_0001;
+                    if (rtc_latched === 1) {
+                        
+                    }
                     if (dump === 1) {
                         //Clock latch, redo when ram rebuilt
                         //console.log("RTC latched");
@@ -782,7 +784,9 @@ function write(pos, val, message = 1) {
         } else if (pos < 0xc000) {
             //Switchable RAM bank
             if (car_type === 2) {
-                XA000[pos - 0xa000] = val & 0b1111;
+                let echo_pos = pos - 0xa000;
+                echo_pos &= 0b1_1111_1111;
+                XA000[echo_pos] = val & 0b1111;
                 if (dump === 1) {
                     //console.log("Switchable RAM bank " + rambank + " written");
                 }
@@ -798,9 +802,9 @@ function write(pos, val, message = 1) {
                         //console.log("Switchable RAM bank " + rambank + " written");
                     }
                 } else {
-                    if (rtc_mode === 0xc) {
-                        rtc_act = (val & 0b0100_0000) >> 6;
-                    }
+                    // if (rtc_mode === 0xc) {
+                    //     rtc_act = (val & 0b0100_0000) >> 6;
+                    // }
                     if (dump === 1) {
                         //console.log("RTC register 0x" + rtc_mode + " written");
                     }
