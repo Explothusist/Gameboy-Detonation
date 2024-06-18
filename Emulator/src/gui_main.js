@@ -178,6 +178,7 @@ let new_game = {};
 let ram_size = 1;
 
 let ram_not_trusted = false;
+let force_ram_trusted = false;
 
 let RAMFileHandle;
 
@@ -381,25 +382,44 @@ function load_ram_data(ram) {
     }
     XA000 = rambanks[rambank];
 };
-function save_current_RAM() {
+function save_current_RAM(manual=false) {
+    rambanks[pram] = XA000;
     let any_non_zero = false;
-    for (let i = 0; i < m_ram.length; i++) {
-        if (m_ram[i] !== 0) {
-            any_non_zero = true;
-        }
+    for (let i = 0; i < Math.min(rambanks.length, ram_size); i++) {
+		for (let j = 0; j < rambanks[i].length; j++) {
+			if (rambanks[i][j] !== 0) {
+				any_non_zero = true;
+			}
+		}
     }
     console.log(any_non_zero);
     if (!any_non_zero) {
-        ram_not_trusted = true;
-        console.log("RAM Data read as blank for unknown reason. Autosave disabled until RAM is saved manually. If you do not know why the RAM is blank, reload the page and try again");
-        alert("RAM Data read as blank for unknown reason. Autosave disabled until RAM is saved manually. If you do not know why the RAM is blank, reload the page and try again");
+		if (!ram_not_trusted && !force_ram_trusted) {
+			ram_not_trusted = true;
+			if (manual) {
+				console.log("RAM Data read as blank for unknown reason. Autosave disabled until RAM is saved manually. If you do not know why the RAM is blank, reload the page and try again. Click Save RAM again to force a save.");
+				alert("RAM Data read as blank for unknown reason. Autosave disabled until RAM is saved manually. If you do not know why the RAM is blank, reload the page and try again. Click Save RAM again to force a save.");
+				force_ram_trusted = true;
+			}else {
+				console.log("RAM Data read as blank for unknown reason. Autosave disabled until RAM is saved manually. If you do not know why the RAM is blank, reload the page and try again.");
+				alert("RAM Data read as blank for unknown reason. Autosave disabled until RAM is saved manually. If you do not know why the RAM is blank, reload the page and try again.");
+			}
+			return;
+		}
     }
-    if (!ram_not_trusted) {
+    if (!ram_not_trusted || force_ram_trusted) {
         let to_save = [];
-        rambanks[pram] = XA000;
         for (let i = 0; i < Math.min(rambanks.length, ram_size); i++) {
             to_save.push(rambanks[i]);
         }
+		if (manual) {
+			fileWritten = function() {
+				alert("RAM Data write complete");
+			};
+			alert("RAM Data write begun. Do not reload page until it is complete.");
+		}else {
+			fileWritten = function() {};
+		}
         writeFile(RAMFileHandle, to_save);
     }
 };
@@ -637,7 +657,7 @@ reset.onclick = function () {
 saveram.onclick = function() {
     if (!gui_has_control) {
         ram_not_trusted = false;
-        save_current_RAM();
+        save_current_RAM(true);
     }
 };
 

@@ -4973,11 +4973,11 @@ function timing_handler(cyc_run) {
                     dma = 0;
                 }
                 snd_store_cycles += cycles-old_cycles;
-                if (snd_store_cycles > 1024) {
+                if (snd_store_cycles > 1024 && sound_enabled) {
                     XFF00 = channel_clocker(1024, XFF00);
                     snd_store_cycles -= 1024;
                 }
-                if (cycles > sound_timer) {
+                if (cycles > sound_timer && sound_enabled) {
                     sound_timer += 8192;
                     XFF00 = frame_sequencer(XFF00);
                 }

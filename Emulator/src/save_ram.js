@@ -21,7 +21,11 @@ async function writeFile(fileHandle, contents) {
         await writable.write(contents[i]);
     }
     await writable.close();
+	fileWritten();
 }
+async function fileWritten() {
+	
+};
 
 async function saveThing(to_save) {
     [fileHandle] = await window.showOpenFilePicker();
