@@ -2,11 +2,19 @@
 let sound = document.getElementById("sound");
 let speed = document.getElementById("speed");
 
+let sq1_toggle = document.getElementById("sq1_toggle");
+let sq2_toggle = document.getElementById("sq2_toggle");
+let wave_toggle = document.getElementById("wave_toggle");
+let ns_toggle = document.getElementById("noise_toggle");
+
 let square_1_source_node;
 let square_2_source_node;
 let wave_table_source_node;
 let noise_source_node;
-let wave_table_amplifier;
+let square_1_toggle;
+let square_2_toggle;
+let wave_table_toggle;
+let noise_toggle;
 let square_1_splitter;
 let square_2_splitter;
 let wave_table_splitter;
@@ -28,6 +36,11 @@ let audio_ctx;
 let sound_enabled = false;
 // let audio_merger;
 
+let process_sq1 = true;
+let process_sq2 = true;
+let process_wave = true;
+let process_noise = true;
+
 sound.onclick = function () {
     audio_ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000 });
 
@@ -38,9 +51,13 @@ sound.onclick = function () {
 
     square_1_splitter = audio_ctx.createChannelSplitter();
     square_2_splitter = audio_ctx.createChannelSplitter();
-    wave_table_amplifier = audio_ctx.createGain();
     wave_table_splitter = audio_ctx.createChannelSplitter();
     noise_splitter = audio_ctx.createChannelSplitter();
+
+    square_1_toggle = audio_ctx.createGain();
+    square_2_toggle = audio_ctx.createGain();
+    wave_table_toggle = audio_ctx.createGain();
+    noise_toggle = audio_ctx.createGain();
 
     left_squares_merger = audio_ctx.createChannelMerger(2);
     right_squares_merger = audio_ctx.createChannelMerger(2);
@@ -60,8 +77,14 @@ sound.onclick = function () {
 
     main_merger = audio_ctx.createChannelMerger(2);
 
-    wave_table_amplifier.gain.setValueAtTime(1, audio_ctx.currentTime);
-    wave_table_amplifier.connect(wave_table_splitter);
+    square_1_toggle.gain.setValueAtTime(1, audio_ctx.currentTime);
+    square_1_toggle.connect(wave_table_splitter);
+    square_2_toggle.gain.setValueAtTime(1, audio_ctx.currentTime);
+    square_2_toggle.connect(wave_table_splitter);
+    wave_table_toggle.gain.setValueAtTime(1, audio_ctx.currentTime);
+    wave_table_toggle.connect(wave_table_splitter);
+    noise_toggle.gain.setValueAtTime(1, audio_ctx.currentTime);
+    noise_toggle.connect(wave_table_splitter);
 
     square_1_splitter.connect(left_squares_merger, 0, 0);
     square_1_splitter.connect(right_squares_merger, 1, 0);
@@ -124,6 +147,51 @@ sound.onclick = function () {
     TriggerBufferReset(noise_gen.id, XFF00);
     speed.innerHTML = "<h3> Speed: " + (Math.round(full_speed/ms_per_cycle*100)) + "%</h3>";
 };
+
+sq1_toggle.addEventListener("change", function () {
+    if (sound_enabled) {
+        if (sq1_toggle.checked === true) {
+            square_1_toggle.gain.setValueAtTime(1, audio_ctx.currentTime);
+            process_sq1 = true;
+        } else {
+            square_1_toggle.gain.setValueAtTime(0, audio_ctx.currentTime);
+            process_sq1 = false;
+        }
+    }
+});
+sq2_toggle.addEventListener("change", function () {
+    if (sound_enabled) {
+        if (sq2_toggle.checked === true) {
+            square_2_toggle.gain.setValueAtTime(1, audio_ctx.currentTime);
+            process_sq2 = true;
+        } else {
+            square_2_toggle.gain.setValueAtTime(0, audio_ctx.currentTime);
+            process_sq2 = false;
+        }
+    }
+});
+wave_toggle.addEventListener("change", function () {
+    if (sound_enabled) {
+        if (wave_toggle.checked === true) {
+            wave_table_toggle.gain.setValueAtTime(1, audio_ctx.currentTime);
+            process_wave = true;
+        } else {
+            wave_table_toggle.gain.setValueAtTime(0, audio_ctx.currentTime);
+            process_wave = false;
+        }
+    }
+});
+ns_toggle.addEventListener("change", function () {
+    if (sound_enabled) {
+        if (ns_toggle.checked === true) {
+            noise_toggle.gain.setValueAtTime(1, audio_ctx.currentTime);
+            process_noise = true;
+        } else {
+            noise_toggle.gain.setValueAtTime(0, audio_ctx.currentTime);
+            process_noise = false;
+        }
+    }
+});
 
 
 let old_time = -1;
@@ -959,7 +1027,7 @@ function TriggerAudioChannel(channel, XFF) {
             square_1_source_node.buffer = square_1_buffer;
             // square_1_source_node.connect(audio_merger);
             // square_1_source_node.connect(audio_ctx.destination);
-            square_1_source_node.connect(square_1_splitter);
+            square_1_source_node.connect(square_1_toggle);
             square_1_source_node.start();
             square_1.started = true;
             break;
@@ -973,7 +1041,7 @@ function TriggerAudioChannel(channel, XFF) {
             square_2_source_node.buffer = square_2_buffer;
             // square_2_source_node.connect(audio_merger);
             // square_2_source_node.connect(audio_ctx.destination);
-            square_2_source_node.connect(square_2_splitter);
+            square_2_source_node.connect(square_2_toggle);
             square_2_source_node.start();
             square_2.started = true;
             break;
@@ -987,7 +1055,7 @@ function TriggerAudioChannel(channel, XFF) {
             wave_table_source_node.buffer = wave_table_buffer;
             // wave_table_source_node.connect(audio_merger);
             // wave_table_source_node.connect(audio_ctx.destination);
-            wave_table_source_node.connect(wave_table_amplifier);
+            wave_table_source_node.connect(wave_table_toggle);
             wave_table_source_node.start();
             wave_table.started = true;
             break;
@@ -1001,7 +1069,7 @@ function TriggerAudioChannel(channel, XFF) {
             noise_source_node.buffer = noise_buffer;
             // noise_source_node.connect(audio_merger);
             // noise_source_node.connect(audio_ctx.destination);
-            noise_source_node.connect(noise_splitter);
+            noise_source_node.connect(noise_toggle);
             noise_source_node.start();
             noise_gen.started = true;
             console.log(noise_buffer_left_data);
@@ -1212,107 +1280,115 @@ function channel_clocker(cycles, XFF) {
         }
 
         // Square Wave 1
-        square_1.cycles += cycles;
-        while (square_1.cycles > (2048-square_1.get_frequency(XFF))*4) {
-            square_1.cycles -= (2048-square_1.get_frequency(XFF))*4;
-            square_1.clock_tick += 1;
-            square_1.clock_tick &= 0b111;
+        if (process_sq1) {
+            square_1.cycles += cycles;
+            while (square_1.cycles > (2048-square_1.get_frequency(XFF))*4) {
+                square_1.cycles -= (2048-square_1.get_frequency(XFF))*4;
+                square_1.clock_tick += 1;
+                square_1.clock_tick &= 0b111;
 
-            // Remap to -1, 1
-            if (control.get_enable(XFF) === 1 && square_1.get_enable(XFF) === 1) {
-                let blip = getSquareWave(square_1.clock_tick, square_1.get_duty(XFF));
-                let left_blip = blip*(square_1.volume/15)*((control.get_left_vol(XFF)+1)/8)*control.get_sq1_left(XFF);
-                let right_blip = blip*(square_1.volume/15)*((control.get_right_vol(XFF)+1)/8)*control.get_sq1_right(XFF);
-                AddAudioBlip(square_1.id, (left_blip*-2)+1, (right_blip*-2)+1, XFF);
-            }else {
-                // console.log("SqWv1 Disabled");
-                AddAudioBlip(square_1.id, 0, 0, XFF);
-            }
-            if (square_1_buffer_pos >= initial_buffer && !square_1.started) {
-                TriggerAudioChannel(square_1.id, XFF);
+                // Remap to -1, 1
+                if (control.get_enable(XFF) === 1 && square_1.get_enable(XFF) === 1) {
+                    let blip = getSquareWave(square_1.clock_tick, square_1.get_duty(XFF));
+                    let left_blip = blip*(square_1.volume/15)*((control.get_left_vol(XFF)+1)/8)*control.get_sq1_left(XFF);
+                    let right_blip = blip*(square_1.volume/15)*((control.get_right_vol(XFF)+1)/8)*control.get_sq1_right(XFF);
+                    AddAudioBlip(square_1.id, (left_blip*-2)+1, (right_blip*-2)+1, XFF);
+                }else {
+                    // console.log("SqWv1 Disabled");
+                    AddAudioBlip(square_1.id, 0, 0, XFF);
+                }
+                if (square_1_buffer_pos >= initial_buffer && !square_1.started) {
+                    TriggerAudioChannel(square_1.id, XFF);
+                }
             }
         }
 
         // Square Wave 2
-        square_2.cycles += cycles;
-        while (square_2.cycles > (2048-square_2.get_frequency(XFF))*4) {
-            square_2.cycles -= (2048-square_2.get_frequency(XFF))*4;
-            square_2.clock_tick += 1;
-            square_2.clock_tick &= 0b111;
+        if (process_sq2) {
+            square_2.cycles += cycles;
+            while (square_2.cycles > (2048-square_2.get_frequency(XFF))*4) {
+                square_2.cycles -= (2048-square_2.get_frequency(XFF))*4;
+                square_2.clock_tick += 1;
+                square_2.clock_tick &= 0b111;
 
-            // Remap to -1, 1
-            if (control.get_enable(XFF) === 1 && square_2.get_enable(XFF) === 1) {
-                let blip = getSquareWave(square_2.clock_tick, square_2.get_duty(XFF));
-                let left_blip = blip*(square_2.volume/15)*((control.get_left_vol(XFF)+1)/8)*control.get_sq2_left(XFF);
-                let right_blip = blip*(square_2.volume/15)*((control.get_right_vol(XFF)+1)/8)*control.get_sq2_right(XFF);
-                AddAudioBlip(square_2.id, (left_blip*-2)+1, (right_blip*-2)+1, XFF);
-            }else {
-                // console.log("SqWv2 Disabled");
-                AddAudioBlip(square_2.id, 0, 0, XFF);
-            }
-            if (square_2_buffer_pos >= initial_buffer && !square_2.started) {
-                TriggerAudioChannel(square_2.id, XFF);
+                // Remap to -1, 1
+                if (control.get_enable(XFF) === 1 && square_2.get_enable(XFF) === 1) {
+                    let blip = getSquareWave(square_2.clock_tick, square_2.get_duty(XFF));
+                    let left_blip = blip*(square_2.volume/15)*((control.get_left_vol(XFF)+1)/8)*control.get_sq2_left(XFF);
+                    let right_blip = blip*(square_2.volume/15)*((control.get_right_vol(XFF)+1)/8)*control.get_sq2_right(XFF);
+                    AddAudioBlip(square_2.id, (left_blip*-2)+1, (right_blip*-2)+1, XFF);
+                }else {
+                    // console.log("SqWv2 Disabled");
+                    AddAudioBlip(square_2.id, 0, 0, XFF);
+                }
+                if (square_2_buffer_pos >= initial_buffer && !square_2.started) {
+                    TriggerAudioChannel(square_2.id, XFF);
+                }
             }
         }
         
         // Wave Table
-        wave_table.cycles += cycles;
-        while (wave_table.cycles > (2048-wave_table.get_frequency(XFF))*2) {
-            wave_table.cycles -= (2048-wave_table.get_frequency(XFF))*2;
-            wave_table.clock_tick += 1;
-            wave_table.clock_tick &= 0b1_1111;
+        if (process_wave) {
+            wave_table.cycles += cycles;
+            while (wave_table.cycles > (2048-wave_table.get_frequency(XFF))*2) {
+                wave_table.cycles -= (2048-wave_table.get_frequency(XFF))*2;
+                wave_table.clock_tick += 1;
+                wave_table.clock_tick &= 0b1_1111;
 
-            // Remap to -1, 1
-            if (control.get_enable(XFF) === 1 && wave_table.get_enable(XFF) === 1 && wave_table.get_dac_power(XFF) === 1) {
-                let blip = getWaveTableWave(wave_table.clock_tick, XFF);
-                let left_blip = blip*((control.get_left_vol(XFF)+1)/8)*control.get_wav_left(XFF);
-                let right_blip = blip*((control.get_right_vol(XFF)+1)/8)*control.get_wav_right(XFF);
-                AddAudioBlip(wave_table.id, (left_blip*-2)+1, (right_blip*-2)+1, XFF);
-            }else {
-                AddAudioBlip(wave_table.id, 0, 0, XFF);
-            }
-            if (wave_table_buffer_pos >= initial_buffer*2 && !wave_table.started) {
-                TriggerAudioChannel(wave_table.id, XFF);
+                // Remap to -1, 1
+                if (control.get_enable(XFF) === 1 && wave_table.get_enable(XFF) === 1 && wave_table.get_dac_power(XFF) === 1) {
+                    let blip = getWaveTableWave(wave_table.clock_tick, XFF);
+                    let left_blip = blip*((control.get_left_vol(XFF)+1)/8)*control.get_wav_left(XFF);
+                    let right_blip = blip*((control.get_right_vol(XFF)+1)/8)*control.get_wav_right(XFF);
+                    AddAudioBlip(wave_table.id, (left_blip*-2)+1, (right_blip*-2)+1, XFF);
+                }else {
+                    AddAudioBlip(wave_table.id, 0, 0, XFF);
+                }
+                if (wave_table_buffer_pos >= initial_buffer*2 && !wave_table.started) {
+                    TriggerAudioChannel(wave_table.id, XFF);
+                }
             }
         }
         
         // Noise Generator
-        noise_gen.cycles += cycles;
-        while (noise_gen.cycles > (noise_gen.get_divisor(XFF) << noise_gen.get_clock_shift(XFF))) {
-            noise_gen.cycles -= (noise_gen.get_divisor(XFF) << noise_gen.get_clock_shift(XFF));
-            // noise_gen.cycles -= (noise_gen.get_divisor_code(XFF)+1)*2;
-            // noise_gen.clock_tick -= 1;
-            
-            // if (noise_gen.clock_tick <= 0) {
-            // noise_gen.clock_tick = 1 << (noise_gen.get_clock_shift(XFF)+1);
+        if (process_noise) {
+            noise_gen.cycles += cycles;
+            while (noise_gen.cycles > (noise_gen.get_divisor(XFF) << noise_gen.get_clock_shift(XFF))) {
+                noise_gen.cycles -= (noise_gen.get_divisor(XFF) << noise_gen.get_clock_shift(XFF));
+                // noise_gen.cycles -= (noise_gen.get_divisor_code(XFF)+1)*2;
+                // noise_gen.clock_tick -= 1;
+                
+                // if (noise_gen.clock_tick <= 0) {
+                // noise_gen.clock_tick = 1 << (noise_gen.get_clock_shift(XFF)+1);
 
-            // Remap to -1, 1
-            if (control.get_enable(XFF) === 1 && noise_gen.get_enable(XFF) === 1) {
-                let blip = getNoiseGeneratorBlip(XFF);
-                // noise_gen.volume = 7;
-                // if (!control.get_noi_left(XFF) || !control.get_noi_right(XFF)) {
-                //     alert("Disabled");
+                // Remap to -1, 1
+                if (control.get_enable(XFF) === 1 && noise_gen.get_enable(XFF) === 1) {
+                    let blip = getNoiseGeneratorBlip(XFF);
+                    // noise_gen.volume = 7;
+                    // if (!control.get_noi_left(XFF) || !control.get_noi_right(XFF)) {
+                    //     alert("Disabled");
+                    // }
+                    let left_blip = blip*(noise_gen.volume/15)*((control.get_left_vol(XFF)+1)/8)*control.get_noi_left(XFF);
+                    let right_blip = blip*(noise_gen.volume/15)*((control.get_right_vol(XFF)+1)/8)*control.get_noi_right(XFF);
+                    if (noise_gen.volume !== 0) {
+                        // console.log(noise_gen.volume, "QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ");
+                    }
+                    if (noise_gen.get_starting_volume(XFF) !== 0) {
+                        // console.log(noise_gen.get_starting_volume(XFF), "QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ");
+                    }
+                    // 
+                    // console.log(blip, left_blip, right_blip);
+                    // console.log(blip, noise_gen.volume, control.get_left_vol(XFF), control.get_noi_left(XFF));
+                    // console.log(blip, noise_gen.volume, control.get_right_vol(XFF), control.get_noi_right(XFF));
+                    AddAudioBlip(noise_gen.id, (left_blip*-2)+1, (right_blip*-2)+1, XFF);
+                }else {
+                    AddAudioBlip(noise_gen.id, 0, 0, XFF);
+                }
+                if (noise_buffer_pos >= initial_buffer && !noise_gen.started) {
+                    TriggerAudioChannel(noise_gen.id, XFF);
+                }
                 // }
-                let left_blip = blip*(noise_gen.volume/15)*((control.get_left_vol(XFF)+1)/8)*control.get_noi_left(XFF);
-                let right_blip = blip*(noise_gen.volume/15)*((control.get_right_vol(XFF)+1)/8)*control.get_noi_right(XFF);
-                if (noise_gen.volume !== 0) {
-                    // console.log(noise_gen.volume, "QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ");
-                }
-                if (noise_gen.get_starting_volume(XFF) !== 0) {
-                    // console.log(noise_gen.get_starting_volume(XFF), "QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ");
-                }
-                // 
-                // console.log(blip, left_blip, right_blip);
-                // console.log(blip, noise_gen.volume, control.get_left_vol(XFF), control.get_noi_left(XFF));
-                // console.log(blip, noise_gen.volume, control.get_right_vol(XFF), control.get_noi_right(XFF));
-                AddAudioBlip(noise_gen.id, (left_blip*-2)+1, (right_blip*-2)+1, XFF);
-            }else {
-                AddAudioBlip(noise_gen.id, 0, 0, XFF);
             }
-            if (noise_buffer_pos >= initial_buffer && !noise_gen.started) {
-                TriggerAudioChannel(noise_gen.id, XFF);
-            }
-            // }
         }
         
         let statuses = 0;
@@ -1329,7 +1405,7 @@ function channel_clocker(cycles, XFF) {
 function length_counter(XFF) {
 
     // Square Wave 1
-    if (square_1.get_enable(XFF) === 1 && square_1.get_length_enable(XFF) === 1) {
+    if (square_1.get_enable(XFF) === 1 && square_1.get_length_enable(XFF) === 1 && process_sq1) {
         square_1.length_counter += 1;
         if (square_1.length_counter >= 64) {
             XFF = square_1.set_enable(XFF, 0);
@@ -1341,7 +1417,7 @@ function length_counter(XFF) {
         // console.log("SqWv1 Length counter triggered");
     }
     //Square Wave 2
-    if (square_2.get_enable(XFF) === 1 && square_2.get_length_enable(XFF) === 1) {
+    if (square_2.get_enable(XFF) === 1 && square_2.get_length_enable(XFF) === 1 && process_sq2) {
         square_2.length_counter += 1;
         if (square_2.length_counter >= 64) {
             XFF = square_2.set_enable(XFF, 0);
@@ -1352,7 +1428,7 @@ function length_counter(XFF) {
         // console.log("SqWv2 Length counter triggered");
     }
     //Wave Table
-    if (wave_table.get_enable(XFF) === 1 && wave_table.get_length_enable(XFF) === 1) {
+    if (wave_table.get_enable(XFF) === 1 && wave_table.get_length_enable(XFF) === 1 && process_wave) {
         wave_table.length_counter += 1;
         if (wave_table.length_counter >= 256) {
             XFF = wave_table.set_enable(XFF, 0);
@@ -1363,7 +1439,7 @@ function length_counter(XFF) {
         // console.log("WvTbl Length counter triggered: length " + length);
     }
     //Noise Generator
-    if (noise_gen.get_enable(XFF) === 1 && noise_gen.get_length_enable(XFF) === 1) {
+    if (noise_gen.get_enable(XFF) === 1 && noise_gen.get_length_enable(XFF) === 1 && process_noise) {
         noise_gen.length_counter += 1;
         if (noise_gen.length_counter >= 64) {
             XFF = noise_gen.set_enable(XFF, 0);
@@ -1380,7 +1456,7 @@ function length_counter(XFF) {
 
 function sweep(XFF) {
     //Square Wave 1
-    if (square_1.get_enable(XFF) === 1 && square_1.get_sweep_period(XFF) !== 0) {
+    if (square_1.get_enable(XFF) === 1 && square_1.get_sweep_period(XFF) !== 0 && process_sq1) {
         square_1.sweep_counter -= 1;
         if (square_1.sweep_counter <= 0) {
             // if (dump_instr === 1) {
@@ -1424,7 +1500,7 @@ function sweep(XFF) {
 function volume_envelope(XFF) {
 
     // Square Wave 1
-    if (square_1.get_enable(XFF) === 1) {
+    if (square_1.get_enable(XFF) === 1 && process_sq1) {
         square_1.env_tick += 1;
         if (square_1.env_tick > square_1.get_envelope_period(XFF) && square_1.get_envelope_period(XFF) !== 0) {
             square_1.env_tick = 0;
@@ -1442,7 +1518,7 @@ function volume_envelope(XFF) {
     }
 
     // Square Wave 2
-    if (square_2.get_enable(XFF) === 1) {
+    if (square_2.get_enable(XFF) === 1 && process_sq2) {
         square_2.env_tick += 1;
         if (square_2.env_tick > square_2.get_envelope_period(XFF) && square_2.get_envelope_period(XFF) !== 0) {
             square_2.env_tick = 0;
@@ -1460,7 +1536,7 @@ function volume_envelope(XFF) {
     }
 
     // Noise Generator
-    if (noise_gen.get_enable(XFF) === 1) {
+    if (noise_gen.get_enable(XFF) === 1 && process_noise) {
         noise_gen.env_tick += 1;
         if (noise_gen.env_tick > noise_gen.get_envelope_period(XFF) && noise_gen.get_envelope_period(XFF) !== 0) {
             noise_gen.env_tick = 0;

@@ -201,7 +201,7 @@ class Register_Storage {
 let ram = new Register_Storage();
 
 dump.addEventListener("change", function () {
-    alert(dump.checked);
+    // alert(dump.checked);
     if (dump.checked === true) {
         cpu_dump_intstr = 1;
         cb_dump_intstr = 1;
@@ -4945,6 +4945,7 @@ function check_cpu_pointer() {
 };
 
 let snd_store_cycles = 0;
+let joystick_timer = 0;
 function timing_handler(cyc_run) {
     if (!stopped) {
         cyc_run = cyc_run || 0;
@@ -4972,14 +4973,18 @@ function timing_handler(cyc_run) {
                     cycles += 160;
                     dma = 0;
                 }
-                snd_store_cycles += cycles-old_cycles;
-                if (snd_store_cycles > 1024 && sound_enabled) {
+                if (cycles >= sound_timer && sound_enabled) {
+                    sound_timer += 1024;
+                    snd_store_cycles += 1024;
                     XFF00 = channel_clocker(1024, XFF00);
-                    snd_store_cycles -= 1024;
+                    if (snd_store_cycles >= 8192 && sound_enabled) {
+                        snd_store_cycles = 0;
+                        XFF00 = frame_sequencer(XFF00);
+                    }
                 }
-                if (cycles > sound_timer && sound_enabled) {
-                    sound_timer += 8192;
-                    XFF00 = frame_sequencer(XFF00);
+                if (cycles >= joystick_timer) {
+                    joystick_timer += 1097;
+                    poll_joysticks();
                 }
                 if (stopped) {
                     return;
@@ -5022,8 +5027,8 @@ function timing_handler(cyc_run) {
             }
             cycles -= 70224;
             sound_timer -= 70224;
+            joystick_timer -= 70224;
             frames += 1;
-            poll_joysticks();
             /*if (!quit) {
                 setTimeout(timing_handler);
             }*/

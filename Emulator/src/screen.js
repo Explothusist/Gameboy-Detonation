@@ -4,6 +4,9 @@ const screen_width = 160;
 const screen_height = 144;
 
 //document.getElementById is acting oddly, but working
+let toggle_bckgnd = document.getElementById("toggle_bckgnd");
+let toggle_wnd = document.getElementById("toggle_wnd");
+let toggle_spr = document.getElementById("toggle_spr");
 
 let scr_abort = false;
 let scr_suspicious = false;
@@ -29,6 +32,20 @@ let old_pall2 = 0b1110_0100;
 
 let scr_d = document.getElementById("display");
 let scr_ddraw = scr_d.getContext("2d");
+
+let toggle_background = true;
+let toggle_window = true;
+let toggle_sprites = true;
+
+toggle_bckgnd.addEventListener("change", function () {
+    toggle_background = toggle_bckgnd.checked;
+});
+toggle_wnd.addEventListener("change", function () {
+    toggle_window = toggle_wnd.checked;
+});
+toggle_spr.addEventListener("change", function () {
+    toggle_sprites = toggle_spr.checked;
+});
 
 function load_lcd(lcd) {
     old_lcd = lcd;
@@ -653,7 +670,7 @@ function draw_dots(dots, xff, read) {
                     let is_background_pixel = false;
                     let background_pixel = 0;
                     // If window is enabled and on screen, it takes precedence over background
-                    if (window_enabled) {
+                    if (window_enabled && toggle_window) {
                         let window_pixel_x = xff[0x4b] - 7;
                         let window_pixel_y = xff[0x4a];
                         
@@ -670,7 +687,7 @@ function draw_dots(dots, xff, read) {
                         }
                     }
                     // Use background if it is enabled and window is not already setting
-                    if (background_enabled && !is_background_pixel) {
+                    if (background_enabled && !is_background_pixel && toggle_background) {
                         // Test if we have left the preloaded window tiles
                         if (pixel_y >= background_line_y+8) {
                             load_new_background_tile_line(pixel_y, xff, read);
@@ -689,7 +706,7 @@ function draw_dots(dots, xff, read) {
                     let sprite_pixel = 0;
                     let sprite_pixel_over = true;
                     let sprite_palette = [];
-                    if (sprite_enabled) {
+                    if (sprite_enabled && toggle_sprites) {
                         //Test if we have loaded this line's sprites
                         if (pixel_y !== sprite_line_y) {
                             load_new_sprite_tile_line(pixel_y, xff, read);
