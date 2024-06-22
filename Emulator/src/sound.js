@@ -6,19 +6,33 @@ let sq1_toggle = document.getElementById("sq1_toggle");
 let sq2_toggle = document.getElementById("sq2_toggle");
 let wave_toggle = document.getElementById("wave_toggle");
 let ns_toggle = document.getElementById("noise_toggle");
+let smooth_snd = document.getElementById("smooth_sound");
+
+let square_1_toggle;
+let square_2_toggle;
+let wave_table_toggle;
+let noise_toggle;
 
 let square_1_source_node;
 let square_2_source_node;
 let wave_table_source_node;
 let noise_source_node;
-let square_1_toggle;
-let square_2_toggle;
-let wave_table_toggle;
-let noise_toggle;
+let square_1_volume;
+let square_2_volume;
+let wave_table_volume;
+let noise_volume;
 let square_1_splitter;
 let square_2_splitter;
 let wave_table_splitter;
 let noise_splitter;
+let square_1_left_enable;
+let square_1_right_enable;
+let square_2_left_enable;
+let square_2_right_enable;
+let wave_table_left_enable;
+let wave_table_right_enable;
+let noise_volume_left_enable;
+let noise_volume_right_enable;
 let left_squares_merger;
 let right_squares_merger;
 let left_others_merger;
@@ -32,6 +46,7 @@ let right_merger;
 let left_converter;
 let right_converter;
 let main_merger;
+let master_volume;
 let audio_ctx;
 let sound_enabled = false;
 // let audio_merger;
@@ -40,6 +55,7 @@ let process_sq1 = true;
 let process_sq2 = true;
 let process_wave = true;
 let process_noise = true;
+let smooth_sound = true;
 
 sound.onclick = function () {
     audio_ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000 });
@@ -189,6 +205,15 @@ ns_toggle.addEventListener("change", function () {
         } else {
             noise_toggle.gain.setValueAtTime(0, audio_ctx.currentTime);
             process_noise = false;
+        }
+    }
+});
+smooth_snd.addEventListener("change", function () {
+    if (sound_enabled) {
+        if (smooth_snd.checked === true) {
+            smooth_sound = true;
+        } else {
+            smooth_sound = false;
         }
     }
 });
@@ -534,7 +559,7 @@ class Noise_Gen {
         return (XFF[0x21] & 0b0000_0111);
     }
     get_clock_shift(XFF) {
-        return (XFF[0x22] & 0b1111_0000) >> 4;
+        return ((XFF[0x22] & 0b1111_0000) >> 4);
     }
     get_width_mode(XFF) {
         return (XFF[0x22] & 0b0000_1000) >> 3;
@@ -780,10 +805,10 @@ function getNoiseGeneratorBlip(XFF) {
     let new_bit = low_bit ^ ((noise_gen.lfsr & 0b10) >> 1);
     noise_gen.lfsr >>= 1;
     if (new_bit === 0) {
-        noise_gen.lfsr |= (1 << 15);
+        noise_gen.lfsr |= (1 << 14);
         if (noise_gen.get_width_mode(XFF) === 1) {
-            noise_gen.lfsr &= 0b11111111_01111111;
-            noise_gen.lfsr |= (1 << 7);
+            noise_gen.lfsr &= !(1 << 6);
+            noise_gen.lfsr |= (1 << 6);
         }
     }
     // speed.innerHTML = "<h3> LFSR: " + noise_gen.lfsr.toString(2).padStart(16, "0") + "</h3>";
@@ -892,8 +917,8 @@ function TriggerBufferReset(channel, XFF) {
             // console.log(hz);
             // console.log(square_1.time_mod);
             // Square 1 always runs at 48000 when sweep is enabled, accounted for at AddAudioBlip, because of frequency constantly changing
-            if (square_1.get_sweep_period(XFF) !== 0 && square_1.get_shift(XFF) === 0) {
-                square_1_buffer = audio_ctx.createBuffer(2, 48000*2, 48000);
+            if (square_1.get_sweep_period(XFF) !== 0 && square_1.get_shift(XFF) !== 0 || !smooth_sound) {
+                square_1_buffer = audio_ctx.createBuffer(2, 48000, 48000);
                 square_1.time_mod = 48000/hz;
             }else {
                 if (hz > 96000) {
@@ -908,7 +933,7 @@ function TriggerBufferReset(channel, XFF) {
                         square_1.time_mod += 1;
                     }
                 }
-                square_1_buffer = audio_ctx.createBuffer(2, Math.round(hz*square_1.time_mod*2), Math.round(hz*square_1.time_mod));
+                square_1_buffer = audio_ctx.createBuffer(2, Math.round(hz*square_1.time_mod), Math.round(hz*square_1.time_mod));
             }
             square_1_buffer_left_data = square_1_buffer.getChannelData(0);
             square_1_buffer_right_data = square_1_buffer.getChannelData(1);
@@ -927,20 +952,25 @@ function TriggerBufferReset(channel, XFF) {
             let hz2 = 1048576/(2048-square_2.get_frequency(XFF));
             // hz2 *= (full_speed/ms_per_cycle)*0.97;
             // console.log(hz2);
-            if (hz2 > 96000) {
-                square_2.time_mod = 0.5; // Not 0.5 so it does not do odd things to waves
-                while ((hz2)*square_2.time_mod > 96000) {
-                    square_2.time_mod *= 0.5;
-                    // square_2.time_mod *= 0.6; // Not *=0.5 so it does not do odd things to waves
+            if (smooth_sound) {
+                if (hz2 > 96000) {
+                    square_2.time_mod = 0.5; // Not 0.5 so it does not do odd things to waves
+                    while ((hz2)*square_2.time_mod > 96000) {
+                        square_2.time_mod *= 0.5;
+                        // square_2.time_mod *= 0.6; // Not *=0.5 so it does not do odd things to waves
+                    }
+                }else if (hz2 < 8000) {
+                    square_2.time_mod = 2;
+                    while (hz2*square_2.time_mod < 8000) {
+                        square_2.time_mod += 1;
+                    }
                 }
-            }else if (hz2 < 8000) {
-                square_2.time_mod = 2;
-                while (hz2*square_2.time_mod < 8000) {
-                    square_2.time_mod += 1;
-                }
+                // console.log(square_2.time_mod);
+                square_2_buffer = audio_ctx.createBuffer(2, Math.round(hz2*square_2.time_mod), Math.round(hz2*square_2.time_mod));
+            }else {
+                square_2_buffer = audio_ctx.createBuffer(2, 48000, 48000);
+                square_2.time_mod = 48000/hz2;
             }
-            // console.log(square_2.time_mod);
-            square_2_buffer = audio_ctx.createBuffer(2, Math.round(hz2*square_2.time_mod*2), Math.round(hz2*square_2.time_mod));
             square_2_buffer_left_data = square_2_buffer.getChannelData(0);
             square_2_buffer_right_data = square_2_buffer.getChannelData(1);
             square_2_buffer_pos = 0;
@@ -957,19 +987,24 @@ function TriggerBufferReset(channel, XFF) {
             // let hz3 = 4194304/freq3*2;
             let hz3 = 2097152/(2048-wave_table.get_frequency(XFF));
             // hz3 *= (full_speed/ms_per_cycle)*0.97;
-            if (hz3 > 96000) {
-                wave_table.time_mod = 0.5; // Not 0.5 so it does not do odd things to waves
-                while ((hz3)*wave_table.time_mod > 96000) {
-                    wave_table.time_mod *= 0.5;
-                    // wave_table.time_mod *= 0.6; // Not o=0.5 so it does not do odd things to waves
+            if (smooth_sound) {
+                if (hz3 > 96000) {
+                    wave_table.time_mod = 0.5; // Not 0.5 so it does not do odd things to waves
+                    while ((hz3)*wave_table.time_mod > 96000) {
+                        wave_table.time_mod *= 0.5;
+                        // wave_table.time_mod *= 0.6; // Not o=0.5 so it does not do odd things to waves
+                    }
+                }else if (hz3 < 8000) {
+                    wave_table.time_mod = 2;
+                    while (hz3*wave_table.time_mod < 8000) {
+                        wave_table.time_mod += 1;
+                    }
                 }
-            }else if (hz3 < 8000) {
-                wave_table.time_mod = 2;
-                while (hz3*wave_table.time_mod < 8000) {
-                    wave_table.time_mod += 1;
-                }
+                wave_table_buffer = audio_ctx.createBuffer(2, Math.round(hz3*wave_table.time_mod), Math.round(hz3*wave_table.time_mod));
+            }else {
+                wave_table_buffer = audio_ctx.createBuffer(2, 48000, 48000);
+                wave_table.time_mod = 48000/hz3;
             }
-            wave_table_buffer = audio_ctx.createBuffer(2, Math.round(hz3*wave_table.time_mod*2), Math.round(hz3*wave_table.time_mod));
             wave_table_buffer_left_data = wave_table_buffer.getChannelData(0);
             wave_table_buffer_right_data = wave_table_buffer.getChannelData(1);
             wave_table_buffer_pos = 0;
@@ -984,21 +1019,27 @@ function TriggerBufferReset(channel, XFF) {
             console.log(hz4);
             
             // hz4 *= (full_speed/ms_per_cycle)*0.97;
-            if (hz4 > 96000) {
-                noise_gen.time_mod = 0.6; // Not 0.5 so it does not do odd things to waves
-                while ((hz4)*noise_gen.time_mod > 96000) {
-                    noise_gen.time_mod *= 0.6;
-                    // noise_gen.time_mod *= 0.6; // Not o=0.5 so it does not do odd things to waves
+            if (smooth_sound) {
+                if (hz4 > 96000) {
+                    noise_gen.time_mod = 0.6; // Not 0.5 so it does not do odd things to waves
+                    while ((hz4)*noise_gen.time_mod > 96000) {
+                        noise_gen.time_mod *= 0.6;
+                        // noise_gen.time_mod *= 0.6; // Not o=0.5 so it does not do odd things to waves
+                    }
+                }else if (hz4 < 8000) {
+                    noise_gen.time_mod = 2;
+                    while (hz4*noise_gen.time_mod < 8000) {
+                        noise_gen.time_mod += 1;
+                    }
                 }
-            }else if (hz4 < 8000) {
-                noise_gen.time_mod = 2;
-                while (hz4*noise_gen.time_mod < 8000) {
-                    noise_gen.time_mod += 1;
-                }
+
+                console.log(noise_gen.time_mod);
+                
+                noise_buffer = audio_ctx.createBuffer(2, Math.round(hz4*noise_gen.time_mod), Math.round(hz4*noise_gen.time_mod));
+            }else {
+                noise_gen.time_mod = 48000/hz4;
+                noise_buffer = audio_ctx.createBuffer(2, 48000, 48000);
             }
-            console.log(noise_gen.time_mod);
-            
-            noise_buffer = audio_ctx.createBuffer(2, Math.round(hz4*noise_gen.time_mod*2), Math.round(hz4*noise_gen.time_mod));
             noise_buffer_left_data = noise_buffer.getChannelData(0);
             noise_buffer_right_data = noise_buffer.getChannelData(1);
             
@@ -1282,7 +1323,7 @@ function channel_clocker(cycles, XFF) {
         // Square Wave 1
         if (process_sq1) {
             square_1.cycles += cycles;
-            while (square_1.cycles > (2048-square_1.get_frequency(XFF))*4) {
+            while (square_1.cycles >= (2048-square_1.get_frequency(XFF))*4) {
                 square_1.cycles -= (2048-square_1.get_frequency(XFF))*4;
                 square_1.clock_tick += 1;
                 square_1.clock_tick &= 0b111;
@@ -1306,7 +1347,7 @@ function channel_clocker(cycles, XFF) {
         // Square Wave 2
         if (process_sq2) {
             square_2.cycles += cycles;
-            while (square_2.cycles > (2048-square_2.get_frequency(XFF))*4) {
+            while (square_2.cycles >= (2048-square_2.get_frequency(XFF))*4) {
                 square_2.cycles -= (2048-square_2.get_frequency(XFF))*4;
                 square_2.clock_tick += 1;
                 square_2.clock_tick &= 0b111;
@@ -1330,7 +1371,7 @@ function channel_clocker(cycles, XFF) {
         // Wave Table
         if (process_wave) {
             wave_table.cycles += cycles;
-            while (wave_table.cycles > (2048-wave_table.get_frequency(XFF))*2) {
+            while (wave_table.cycles >= (2048-wave_table.get_frequency(XFF))*2) {
                 wave_table.cycles -= (2048-wave_table.get_frequency(XFF))*2;
                 wave_table.clock_tick += 1;
                 wave_table.clock_tick &= 0b1_1111;
@@ -1353,7 +1394,7 @@ function channel_clocker(cycles, XFF) {
         // Noise Generator
         if (process_noise) {
             noise_gen.cycles += cycles;
-            while (noise_gen.cycles > (noise_gen.get_divisor(XFF) << noise_gen.get_clock_shift(XFF))) {
+            while (noise_gen.cycles >= (noise_gen.get_divisor(XFF) << noise_gen.get_clock_shift(XFF))) {
                 noise_gen.cycles -= (noise_gen.get_divisor(XFF) << noise_gen.get_clock_shift(XFF));
                 // noise_gen.cycles -= (noise_gen.get_divisor_code(XFF)+1)*2;
                 // noise_gen.clock_tick -= 1;
@@ -1454,6 +1495,8 @@ function length_counter(XFF) {
     return XFF;
 };
 
+let oneOver1048576 = 1/1048756;
+let oneOver48000 = 1/48000;
 function sweep(XFF) {
     //Square Wave 1
     if (square_1.get_enable(XFF) === 1 && square_1.get_sweep_period(XFF) !== 0 && process_sq1) {
@@ -1484,8 +1527,8 @@ function sweep(XFF) {
                     XFF = square_1.set_frequency(XFF, freq);
                 }
                 square_1.shadow_freq = freq;
-                let hz = 1048576/(2048-freq);
-                square_1.time_mod = 48000/hz;
+                let hz = (2048-freq)*oneOver1048576;
+                square_1.time_mod = hz*oneOver48000;
                 // if (dump_instr === 1) {
                     // console.log("Shift Successful");
                 // }
