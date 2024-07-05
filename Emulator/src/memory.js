@@ -435,8 +435,104 @@ function setup(rom) {
     // if (car_type === 5) {
     rombanks[0] = X0000;
     // }
-}
+};
 
+let DIV_last_reset = {frame: 0, cycle: 0};
+
+function read_special_registers(curr_frame, curr_cyc, pos) {
+    //0xFF00 I/O Ports
+    if (pos === 0xff00) {
+        let xff00 = XFF00[0x0];
+        if ( (xff00 & 0b1_0000) >> 4 !== p14 || (xff00 & 0b10_0000) >> 5 !== p15 || key_change ) {
+            p14 = xff00 & 0b1_0000;
+            p15 = xff00 & 0b10_0000;
+            if (p14 === 0) {
+                //all are backwards 0=select/pressed
+                let mask = 0;
+                if (keyr === 0) {
+                    mask += 1;
+                }
+                if (keyl === 0) {
+                    mask += 0b10;
+                }
+                if (keyu === 0) {
+                    mask += 0b100;
+                }
+                if (keyd === 0) {
+                    mask += 0b1000;
+                }
+                xff00 &= 0b11_0000;
+                xff00 |= mask;
+            }
+            if (p15 === 0) {
+                let mask = 0;
+                if (keya === 0) {
+                    mask += 1;
+                }
+                if (keyb === 0) {
+                    mask += 0b10;
+                }
+                if (keyse === 0) {
+                    mask += 0b100;
+                }
+                if (keyst === 0) {
+                    mask += 0b1000;
+                }
+                xff00 &= 0b11_0000;
+                xff00 |= mask;
+            }
+            XFF00[0x0] = xff00;
+            return xff00;
+        }
+    }
+    //0xFF01 Serial IO data (ignored)
+    //0xFF02 Serial IO control (ignored)
+    //0xFF04 DIV timer
+    if (pos === xff04) {
+        xff04 += (((curr_frame-DIV_last_reset.frame)*5280)+((curr_cyc-DIV_last_reset.cycle)) * 0.00397558594) % 256;
+        XFF00[0x04] = Math.floor(xff04);
+        return xff04;
+    }
+    //0xFF05 TIMA interrupt timer
+    // Handled periodically
+
+    //0xFF06 TIMA timer reset value
+    //0xFF07 TIMA timer settings
+    //0xFF0F Interrupt Flag (set by interrupt_handle();)
+    //0xFF10-0xFF3F Sound (ignored)
+    //0xFF40 LCD Control (input)
+    //0xFF41 LCD STAT
+    if (pos === 0xff44) {
+        return Math.floor(curr_cyc / 456);
+    }
+    if (pos === 0xff41) {
+        let xff44 = Math.floor(curr_cyc / 456);
+        let mask = 0;
+        if (xff44 >= 144 && xff44 <= 153) {
+            //mode 01
+            mask += 1;
+        } else {
+            if (curr_cyc % 456 < 80) {
+
+            } else if (curr_cyc % 456 < 252) {
+                //mode 10
+                mask += 2;
+            } else {
+                //mode 11
+                mask += 3;
+            }
+        }
+        let xff41 = XFF00[41];
+        if (xff44 === XFF00[0x45] && (xff41 & 0b0100_0000) >> 6 === 1) {
+            mask += 0b100;
+        }
+        xff41 &= 0b0111_1000;
+        xff41 |= mask;
+        XFF00[0x41] = xff41;
+        return xff41;
+    }
+    //0xFF44 Scan line (Y)
+};
 
 let sound_registers = [
     0x80, 0x3f, 0x00, 0xff, 0xbf,
@@ -547,6 +643,10 @@ function read(pos, message = 1) {
         if (pos >= 0xff10 && pos <= 0xff26) {
             return (XFF00[pos - 0xff00] | sound_registers[pos - 0xff10]);
         }
+        let ret = read_special_registers(frames, cycles, pos);
+        if (ret !== undefined) {
+            return ret;
+        }
         return XFF00[pos - 0xff00];
     } else if (pos < 0xff80) {
         //Empty (+ I/O ports?)
@@ -567,7 +667,7 @@ function read(pos, message = 1) {
         }
         return XFFFF;
     }
-}
+};
 
 function dma_trans(pos) {
     let addr = pos * 0x100;
@@ -865,6 +965,7 @@ function write(pos, val, message = 1) {
             } else if (pos === 0xff04) {
                 //Div Timer
                 XFF00[4] = 0;
+                DIV_last_reset = {fram: frames, cycle: cycles};
             // }else if (pos === 0xff11) {
             //     //NR11 Length Counter
             //     val &= 0b1100_0000;

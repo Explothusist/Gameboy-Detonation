@@ -55,9 +55,7 @@ let pos = 0x100; //PC
 if (run_boot_rom) {
     pos = 0x00;
 }
-let cycles = 0;
 let sound_timer = 8183.59375;
-let frames = 0;
 
 let keybindings = ["ArrowLeft", "ArrowDown", "ArrowRight", "ArrowUp", "z", "x", "Enter", "Shift"];
 
@@ -4589,73 +4587,27 @@ function poll_joysticks() {
 
 function spc_reg(cyc) {
     //0xFF00 I/O Ports
-    let xff00 = read(0xff00, 0);
-    if ( (xff00 & 0b1_0000) >> 4 !== p14 || (xff00 & 0b10_0000) >> 5 !== p15 || key_change ) {
-        p14 = xff00 & 0b1_0000;
-        p15 = xff00 & 0b10_0000;
-        if (p14 === 0) {
-            //all are backwards 0=select/pressed
-            let mask = 0;
-            if (keyr === 0) {
-                mask += 1;
-            }
-            if (keyl === 0) {
-                mask += 0b10;
-            }
-            if (keyu === 0) {
-                mask += 0b100;
-            }
-            if (keyd === 0) {
-                mask += 0b1000;
-            }
-            xff00 &= 0b11_0000;
-            xff00 |= mask;
-        }
-        if (p15 === 0) {
-            let mask = 0;
-            if (keya === 0) {
-                mask += 1;
-            }
-            if (keyb === 0) {
-                mask += 0b10;
-            }
-            if (keyse === 0) {
-                mask += 0b100;
-            }
-            if (keyst === 0) {
-                mask += 0b1000;
-            }
-            xff00 &= 0b11_0000;
-            xff00 |= mask;
-        }
-        write(0xff00, xff00, 0);
-    }
+    // Handled on read
+
     //0xFF01 Serial IO data (ignored)
     //0xFF02 Serial IO control (ignored)
     //0xFF04 DIV timer
-    if (read(0xff04, 0) === 0) {
-        xff04 = 0;
-    }
-    xff04 += cyc * 0.397558594;
-    if (xff04 >= 256) {
-        xff04 -= 256;
-    }
-    write(0xff04, Math.floor(xff04), 0);
+    // Handled on read
+
     //0xFF05 TIMA interrupt timer
-    let xff07 = read(0xff07, 0);
-    if ((xff07 & 0b100) >> 2 === 1) {
-        switch (xff07 & 0b11) {
+    if ((XFF00[0x07] & 0b100) >> 2 === 1) {
+        switch (XFF00[0x07] & 0b11) {
             case 0:
-                xff05 += cyc;
+                xff05 += cyc/256;
                 break;
             case 1:
-                xff05 += cyc * 65.5;
+                xff05 += cyc/4;
                 break;
             case 2:
-                xff05 += cyc * 16.25;
+                xff05 += cyc/16;
                 break;
             case 3:
-                xff05 += cyc * 4;
+                xff05 += cyc/64;
                 break;
             default:
                 alert("The laws of magic are breaking down.");
@@ -4664,7 +4616,7 @@ function spc_reg(cyc) {
             xff05 -= 256 - read(0xff06, 0);
             throw_timer = 1;
         }
-        write(0xff04, Math.floor(xff05), 0);
+        XFF00[0x05] = Math.floor(xff05);
     }
     //0xFF06 TIMA timer reset value
     //0xFF07 TIMA timer settings
@@ -4672,14 +4624,13 @@ function spc_reg(cyc) {
     //0xFF10-0xFF3F Sound (ignored)
     //0xFF40 LCD Control (input)
     //0xFF41 LCD STAT
-    let xff40 = read(0xff40, 0);
-    let xff41 = read(0xff41, 0);
+    // let xff40 = read(0xff40, 0);
+    let xff41 = XFF00[0x41];
     let xff44 = Math.floor(cyc / 456);
     let mask = 0;
     //if ((xff40 & 0b1000_0000) >> 7 === 1) {
     if (xff44 >= 144 && xff44 <= 153) {
         //mode 01
-        mask += 1;
         if (old_stat !== 1) {
             old_stat = 1;
             throw_vblank = 1;
@@ -4713,24 +4664,24 @@ function spc_reg(cyc) {
             }
         }
     }
-    if (xff44 === read(0xff45, 0) && (xff41 & 0b0100_0000) >> 6 === 1) {
+    if (xff44 === XFF00[0x45] && (XFF00[0x41] & 0b0100_0000) >> 6 === 1) {
         mask += 0b100;
         if (throw_lcdc === 0) {
             throw_lcdc = 1;
         }
     } else {
-        throw_lcdc = 0;
+        // throw_lcdc = 0;
     }
     xff41 &= 0b0111_1000;
     xff41 |= mask;
-    write(0xff41, xff41, 0);
+    XFF00[0x41] = xff41;
     //0xFF44 Scan line (Y)
     /*if ((xff40 & 0b1000_0000) >> 7 === 1) {
         write(0xFF44, xff44, 0);
     }else {*/
-    write(0xff44, xff44, 0);
+    // write(0xff44, xff44, 0);
     //}
-}
+};
 
 function interrupt_handle() {
     let xff0f = 0;
@@ -4846,7 +4797,7 @@ function disp_condition(orgpos) {
     old_ram.E = ram.E;
     old_ram.H = ram.H;
     old_ram.L = ram.L;
-}
+};
 
 function cpu_cycle(single) {
     if (!stopped) {
@@ -4896,11 +4847,11 @@ function cpu_cycle(single) {
     } else {
         alert("Waiting for key press...");
     }
-}
+};
 
 function run_handler() {
     timing_handler();
-}
+};
 
 function check_registers() {
     if (ram.A === undefined) {
@@ -5082,26 +5033,26 @@ function timing_handler(cyc_run) {
     } else {
         console.log("Waiting for key press...");
     }
-}
+};
 
 let loop = undefined;
 
 function beginLoop() {
     quit = false;
     loop = setInterval(run_handler, 0);
-}
+};
 function endLoop() {
     clearInterval(loop);
     quit = true;
     stop_all_sound();
-}
+};
 
 let zed = 0;
 function read_unpack(unpack) {
     let ret = unpack[zed];
     zed++;
     return ret;
-}
+};
 
 function unpack_state(unpack) {
     let ret = read_unpack(unpack);
@@ -5127,7 +5078,7 @@ function unpack_state(unpack) {
     alert(pos);*/
     load_state(unpack, z);
     alert("Save State Loaded");
-}
+};
 
 function cpu_reset() {
     if (run_boot_rom) {

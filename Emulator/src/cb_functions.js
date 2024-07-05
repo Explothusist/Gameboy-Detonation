@@ -2,6 +2,10 @@ let dump_instr = 0;
 let cb_abort = false;
 let cb_suspicious = false;
 
+
+let frames = 0;
+let cycles = 0;
+
 //Complete: 0,1,2,3,4,5,6,7,8,9,A,B,C,D,E,F
 
 let Flag = { Z: false, N: false, H: false, C: false };
