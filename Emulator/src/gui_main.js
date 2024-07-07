@@ -661,6 +661,23 @@ saveram.onclick = function() {
     }
 };
 
+document.addEventListener("keydown", function (event) {
+    if (gui_has_control) {
+        let key = event.key;
+        if (!menubar.next_key_grabbed) {
+            if (key === keybindings[3] && key !== "Enter" && key !== "ArrowDown") {
+                key = "ArrowUp";
+            }else if (key === keybindings[1] && key !== "Enter" && key !== "ArrowUp") {
+                key = "ArrowDown";
+            }else if (key === keybindings[6] && key !== "ArrowDown" && key !== "ArrowUp") {
+                key = "Enter";
+            }
+        }
+        if (key === "ArrowUp" || key === "ArrowDown" || key === "Enter" || m_menu.next_key_grabbed) {
+            event.preventDefault();
+        }
+    }
+});
 document.addEventListener("keyup", function (event) {
     if (gui_has_control) {
         let key = event.key;
