@@ -168,7 +168,7 @@ sound.onclick = function () {
             // Math.random() is in [0; 1.0]
             // audio needs to be in [-1.0; 1.0]
             // nowBuffering[i] = Math.random() * 2 - 1;
-            nowBuffering[i] = Math.sin(i*0.25);
+            nowBuffering[i] = Math.sin(i*0.25)*0.25;
         }
     }
 
@@ -181,7 +181,7 @@ sound.onclick = function () {
 
     // connect the AudioBufferSourceNode to the
     // destination so we can hear the sound
-    source.connect(square_1_splitter);
+    source.connect(audio_ctx.destination);
 
     // start the source playing
     source.start();
