@@ -254,9 +254,9 @@ smooth_snd.addEventListener("change", function () {
 
 let old_time = -1;
 let num_of_cycles = 0;
-let ms_per_cycle = 4.8e-7;
+let ms_per_cycle = 2.3866e-7;
 let full_speed = 2.3866e-7;
-let watchdog_ms_per_cycle = 4.8e-7;
+let watchdog_ms_per_cycle = 2.3866e-7;
 let half_ms = true;
 
 
@@ -1360,9 +1360,9 @@ let sound_by_ms = true; // system ms vs CPU cycles
 let overflow_cycles = 0;
 
 function channel_clocker(cycles, XFF) {
-    if (XFF !== old_xff) {
-        load_xff(XFF);
-    }
+    // if (XFF !== old_xff) {
+    //     load_xff(XFF);
+    // }
     if (sound_enabled) {
 
         if (old_time !== -1) {
@@ -1721,9 +1721,9 @@ function volume_envelope(XFF) {
 };
 
 function frame_sequencer(XFF) {
-    if (XFF !== old_xff) {
-        load_xff(XFF);
-    }
+    // if (XFF !== old_xff) {
+    //     load_xff(XFF);
+    // }
     if (sound_enabled) {
         // console.log(ms_per_cycle);
         if (control.get_enable(XFF) === 1) {
