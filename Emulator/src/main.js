@@ -217,6 +217,7 @@ begin.onclick = function () {
     if (go === 2) {
         go = 3;
         begin.innerHTML = "Pause";
+        getScreenContext();
         beginLoop();
     } else if (go === 3) {
         go = 2;

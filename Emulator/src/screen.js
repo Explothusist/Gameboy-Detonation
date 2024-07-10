@@ -33,6 +33,16 @@ let old_pall2 = 0b1110_0100;
 let scr_d = document.getElementById("display");
 let scr_ddraw = scr_d.getContext("2d");
 
+const tiny_screen = new OffscreenCanvas(160, 144);
+const ts_ctx = tiny_screen.getContext("2d");
+
+function getScreenContext() {
+    scr_d = document.getElementById("display");
+    scr_ddraw = scr_d.getContext("2d");
+    scr_ddraw.imageSmoothingEnabled = false;
+    // scr_ddraw.scale(scale, scale);
+};
+
 let toggle_background = true;
 let toggle_window = true;
 let toggle_sprites = true;
@@ -280,8 +290,8 @@ function draw_tile(tile, x, y, sprite, flip) {
 }
 
 function draw(xff, read) {
-    scr_d = document.getElementById("display");
-    scr_ddraw = scr_d.getContext("2d");
+    // scr_d = document.getElementById("display");
+    // scr_ddraw = scr_d.getContext("2d");
     if (xff[0x40] !== old_lcd) {
         load_lcd(xff[0x40]);
     }
@@ -638,9 +648,23 @@ function load_new_sprite_tile_line(pixel_y, xff, read) {
     sprite_line_y = pixel_y;
 };
 
+let scanline_image_data = scr_ddraw.createImageData(160, 1);
+function hex_to_greyscale(hex) {
+    switch (hex) {
+        case "#FFFFFF":
+            return 0xff;
+        case "#AAAAAA":
+            return 0xaa;
+        case "#555555":
+            return 0x55;
+        case "#000000":
+            return 0;
+    }
+};
+
 function draw_dots(dots, xff, read) {
-    scr_d = document.getElementById("display");
-    scr_ddraw = scr_d.getContext("2d");
+    // scr_d = document.getElementById("display");
+    // scr_ddraw = scr_d.getContext("2d");
     if (xff[0x40] !== old_lcd) {
         load_lcd(xff[0x40]);
     }
@@ -740,8 +764,18 @@ function draw_dots(dots, xff, read) {
                         }
                     }
 
-                    scr_ddraw.fillStyle = pixel;
-                    scr_ddraw.fillRect(pixel_x * scale, pixel_y * scale, scale, scale);
+                    // scr_ddraw.fillStyle = pixel;
+                    // scr_ddraw.fillRect(pixel_x * scale, pixel_y * scale, scale, scale);
+
+                    // Create our own image to improve performance
+                    // Adds this pixel to the ImageData element which wil be drawn at
+                    // the end of the scanline
+                    let greyscale_value = hex_to_greyscale(pixel);
+                    // console.log(pixel, greyscale_value);
+                    scanline_image_data.data[(pixel_x*4)] = greyscale_value;
+                    scanline_image_data.data[(pixel_x*4)+1] = greyscale_value;
+                    scanline_image_data.data[(pixel_x*4)+2] = greyscale_value;
+                    scanline_image_data.data[(pixel_x*4)+3] = 0xff;
                 }
             }
         }
@@ -749,14 +783,25 @@ function draw_dots(dots, xff, read) {
         dot_on_line += 1;
         if (dot_on_line >= 456) {
             dot_on_line = 0;
+
+            // End of scanline has been reached; draw the ImageData
+            // from the line. No need to clear because it will be 
+            // overridden
+            ts_ctx.putImageData(scanline_image_data, 0, scanline/**scale*/);
+
             scanline += 1;
             if (scanline >= 154) {
                 scanline = 0;
                 // Hack to prevent overflow drawing of next frame
+                // I am not sure of the relevance of the above comment
                 break;
             }
         }
     }
+};
+
+function transfer_frame() {
+    scr_ddraw.drawImage(tiny_screen, 0, 0, 160, 144, 0, 0, 160*scale, 144*scale);
 };
 
 function reset_screen_drawing() {

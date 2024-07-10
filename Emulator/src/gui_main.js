@@ -484,6 +484,7 @@ start_game = function() {
     if (rom_ready && ram_ready) {
         prepare_cpu(m_rom);
         begin.innerHTML = "Pause";
+        getScreenContext();
         beginLoop();
 
         save_loop = setInterval(save_current_RAM, 5000);
@@ -637,6 +638,7 @@ begin.onclick = function () {
         if (go === 2) {
             go = 3;
             begin.innerHTML = "Pause";
+            getScreenContext();
             beginLoop();
             save_loop = setInterval(save_current_RAM, 10000);
         } else if (go === 3) {

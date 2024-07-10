@@ -4976,6 +4976,7 @@ function timing_handler(cyc_run) {
                 check_registers();
                 check_cpu_pointer();
             }
+            transfer_frame();
             cycles -= 70224;
             sound_timer -= 70224;
             joystick_timer -= 70224;
