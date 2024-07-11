@@ -11,7 +11,7 @@ let cpu_timestamp = new Date();
 
 let err_log = []; //Error Log, rolling last 50 instructions+effects
 // WARNING: Enabling Error Log leads to a drop in performance!
-const err_log_en = false; //Array is most recent last for efficiency
+const err_log_en = true; //Array is most recent last for efficiency
 let log_len = 200;
 let stop_on_err = false;
 let stoprightnow = false;
@@ -4809,7 +4809,7 @@ function cpu_cycle(single) {
     if (!stopped) {
         single = single || false;
         let orgpos = pos;
-        if (err_log_en) {
+        if (err_log_en && !no_debug) {
             var arg1 = read(pos + 1, 0);
             var arg2 = read(pos + 2, 0);
         }
@@ -4830,7 +4830,7 @@ function cpu_cycle(single) {
                 return;
             }
         }
-        if (err_log_en) {
+        if (err_log_en && !no_debug) {
             err_log_build(orgpos, instr, arg1, arg2);
         }
 
