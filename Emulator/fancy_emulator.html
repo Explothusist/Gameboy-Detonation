@@ -66,6 +66,16 @@
     <div id="sound_setup">
       <button id="sound">Setup Sound</button>
     </div>
+    
+    <button type="button" class="collapser">Emulator Speed</button>
+    <div class="collapsed" id="emulator_speed">
+      <label for="throttle_speed">Emulator Speed: </label>
+      <input type="number" id="throttle_speed" step="10" value="100">
+      <input type="checkbox" id="unthrottled">
+      <label for="unthrottled">Unthrottled</label>
+      <input type="checkbox" id="remove_debug">
+      <label for="remove_debug">Remove Debug</label>
+    </div>
 
     <button type="button" class="collapser">Emulation</button>
     <div class="collapsed" id="emulation">

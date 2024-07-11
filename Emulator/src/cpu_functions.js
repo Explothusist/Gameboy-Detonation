@@ -4,6 +4,8 @@ let log_pos = document.getElementById("log_pos");
 let log_run = document.getElementById("log_run");
 let log_run_back = document.getElementById("log_run_back");
 let throttle_speed = document.getElementById("throttle_speed");
+let check_throttle = document.getElementById("unthrottled");
+let remove_debug = document.getElementById("remove_debug");
 
 let cpu_timestamp = new Date();
 
@@ -481,10 +483,12 @@ let nop_counter = 0;
 function run0x00() {
     //NOP
     //Do Nothing
-    nop_counter += 2;
-    if (nop_counter >= 20) {
-        alert("Suspiciously many NOPs");
-        cpu_abort = true;
+    if (!no_debug) {
+        nop_counter += 2;
+        if (nop_counter >= 20) {
+            alert("Suspiciously many NOPs");
+            cpu_abort = true;
+        }
     }
     
     cycles += 4;
@@ -4900,156 +4904,173 @@ function check_cpu_pointer() {
 let snd_store_cycles = 0;
 let joystick_timer = 0;
 let next_frame_starts = 0;
-const full_speed_frame_takes = 15.75; // Theoretical: 15.75, fps: 59.7
-const flat_minus = 0;// Experimentally: 1.75
-let each_frame_takes = full_speed_frame_takes-flat_minus;
+const full_speed_fps = 59.7; // Theoretical: 15.75, fps: 59.7
+// const flat_minus = 0;// Experimentally: 1.75
+let each_frame_takes = (1/full_speed_fps)*1000;
+
+let unthrottled = false;
 
 throttle_speed.addEventListener("change", function() {
-    each_frame_takes = (full_speed_frame_takes*(2-(throttle_speed.valueAsNumber*0.01)))-flat_minus;
+    // each_frame_takes = (full_speed_frame_takes*(2-(throttle_speed.valueAsNumber*0.01)));
+    each_frame_takes = (1/(full_speed_fps*throttle_speed.valueAsNumber*0.01))*1000;
+});
+check_throttle.addEventListener("change", function() {
+    unthrottled = check_throttle.checked;
+});
+remove_debug.addEventListener("change", function() {
+    no_debug = remove_debug.checked;
 });
 
 function timing_handler(cyc_run) {
-    // if (Date.now() > next_frame_starts) {
-        next_frame_starts = Date.now()+each_frame_takes;
-        if (!stopped) {
-            cyc_run = cyc_run || 0;
+    next_frame_starts += each_frame_takes;
+    if (!stopped) {
+        cyc_run = cyc_run || 0;
 
-            //cpu_timestamp = new Date();
-            //console.log(cpu_timestamp.getTime());
-            
-            if (cyc_run === 0) {
-                // Safety in case we get off somehow
-                reset_screen_drawing();
-                // Overflow from last screen drawn now
-                draw_dots(cycles, XFF00, read);
-                while (cycles < 70224) {
-                    let old_cycles = cycles;
-                    cpu_cycle();
+        //cpu_timestamp = new Date();
+        //console.log(cpu_timestamp.getTime());
+        
+        if (cyc_run === 0) {
+            // Safety in case we get off somehow
+            reset_screen_drawing();
+            // Overflow from last screen drawn now
+            draw_dots(cycles, XFF00, read);
+            while (cycles < 70224) {
+                let old_cycles = cycles;
+                cpu_cycle();
 
-                    spc_reg(cycles);
-                    interrupt_handle();
-                    if (interrupts_delayed_true) {
-                        interrupts = true;
-                        interrupts_delayed_true = false;
+                spc_reg(cycles);
+                interrupt_handle();
+                if (interrupts_delayed_true) {
+                    interrupts = true;
+                    interrupts_delayed_true = false;
+                }
+                draw_dots(cycles-old_cycles, XFF00, read);
+                if (dma === 1) {
+                    cycles += 160;
+                    dma = 0;
+                }
+                if (cycles >= sound_timer && sound_enabled) {
+                    sound_timer += 1024;
+                    snd_store_cycles += 1024;
+                    XFF00 = channel_clocker(1024, XFF00);
+                    if (snd_store_cycles >= 8192 && sound_enabled) {
+                        snd_store_cycles = 0;
+                        XFF00 = frame_sequencer(XFF00);
                     }
-                    draw_dots(cycles-old_cycles, XFF00, read);
-                    if (dma === 1) {
-                        cycles += 160;
-                        dma = 0;
-                    }
-                    if (cycles >= sound_timer && sound_enabled) {
-                        sound_timer += 1024;
-                        snd_store_cycles += 1024;
-                        XFF00 = channel_clocker(1024, XFF00);
-                        if (snd_store_cycles >= 8192 && sound_enabled) {
-                            snd_store_cycles = 0;
-                            XFF00 = frame_sequencer(XFF00);
-                        }
-                    }
-                    if (cycles >= joystick_timer) {
-                        joystick_timer += 1097;
-                        poll_joysticks();
-                    }
-                    if (stopped) {
-                        return;
-                    }
+                }
+                if (cycles >= joystick_timer) {
+                    joystick_timer += 1097;
+                    poll_joysticks();
+                }
+                if (!no_debug) {
                     if (/*snd_suspicious || */scr_suspicious || cb_suspicious || mem_suspicious || cpu_suspicious ) {
                         check_sus();
-                    }
-                    if (cpu_abort/* || snd_abort*/ || cb_abort || mem_abort || scr_abort) {
-                        if (cpu_abort) {
-                            alert("CPU Abort");
-                            cpu_abort = false;
-                        }
-                        /*if (snd_abort) {
-                            alert("Sound Abort");
-                            cpu_abort = false;
-                        }*/
-                        if (scr_abort) {
-                            alert("Screen Abort");
-                            cpu_abort = false;
-                        }
-                        if (cb_abort) {
-                            alert("CB Abort");
-                            cpu_abort = false;
-                        }
-                        if (mem_abort) {
-                            alert("Memory Abort");
-                            cpu_abort = false;
-                        }
-                        endLoop();
-                        return;
-                    }
-                    if (stoprightnow) {
-                        stoprightnow = false;
-                        endLoop();
-                        return;
                     }
                     nop_counter = Math.max(nop_counter-1, 0);
                     check_registers();
                     check_cpu_pointer();
                 }
-                transfer_frame();
-                cycles -= 70224;
-                sound_timer -= 70224;
-                joystick_timer -= 70224;
-                frames += 1;
-                /*if (!quit) {
-                    setTimeout(timing_handler);
-                }*/
-            } else {
-                if (cyc_run === 456) {
-                    let orgpos = pos;
-                    let ffs = -1;
-                    while (ffs < cycles % 456) {
-                        ffs = cycles % 456;
-                        orgpos = pos;
-                        cpu_cycle();
-                        spc_reg(cycles);
-                        interrupt_handle();
-                        if (dma === 1) {
-                            cycles += 160;
-                            dma = 0;
-                        }
-                        if (cycles > 70224) {
-                            cycles -= 70224;
-                            cyc_run -= 70224;
-                            frames += 1;
-                        }
+                if (stopped) {
+                    return;
+                }
+                if (cpu_abort/* || snd_abort*/ || cb_abort || mem_abort || scr_abort) {
+                    if (cpu_abort) {
+                        alert("CPU Abort");
+                        cpu_abort = false;
                     }
-                    disp_condition(orgpos);
-                } else {
-                    let orgpos = 0;
-                    cyc_run += cycles;
-                    while (cycles < cyc_run) {
-                        orgpos = pos;
-                        cpu_cycle();
-                        spc_reg(cycles);
-                        interrupt_handle();
-                        if (dma === 1) {
-                            cycles += 160;
-                            dma = 0;
-                        }
-                        if (cycles > 70224) {
-                            cycles -= 70224;
-                            cyc_run -= 70224;
-                            frames += 1;
-                        }
+                    /*if (snd_abort) {
+                        alert("Sound Abort");
+                        cpu_abort = false;
+                    }*/
+                    if (scr_abort) {
+                        alert("Screen Abort");
+                        cpu_abort = false;
                     }
-                    disp_condition(orgpos);
+                    if (cb_abort) {
+                        alert("CB Abort");
+                        cpu_abort = false;
+                    }
+                    if (mem_abort) {
+                        alert("Memory Abort");
+                        cpu_abort = false;
+                    }
+                    endLoop();
+                    return;
+                }
+                if (stoprightnow) {
+                    stoprightnow = false;
+                    endLoop();
+                    return;
                 }
             }
-
-            //draw(XFF00, read);
-
-            //cpu_timestamp = new Date();
-            //console.log(/*cpu_timestamp.getTime() + */" : frame " + frames);
+            transfer_frame();
+            cycles -= 70224;
+            sound_timer -= 70224;
+            joystick_timer -= 70224;
+            frames += 1;
+            /*if (!quit) {
+                setTimeout(timing_handler);
+            }*/
         } else {
-            console.log("Waiting for key press...");
+            if (cyc_run === 456) {
+                let orgpos = pos;
+                let ffs = -1;
+                while (ffs < cycles % 456) {
+                    ffs = cycles % 456;
+                    orgpos = pos;
+                    cpu_cycle();
+                    spc_reg(cycles);
+                    interrupt_handle();
+                    if (dma === 1) {
+                        cycles += 160;
+                        dma = 0;
+                    }
+                    if (cycles > 70224) {
+                        cycles -= 70224;
+                        cyc_run -= 70224;
+                        frames += 1;
+                    }
+                }
+                disp_condition(orgpos);
+            } else {
+                let orgpos = 0;
+                cyc_run += cycles;
+                while (cycles < cyc_run) {
+                    orgpos = pos;
+                    cpu_cycle();
+                    spc_reg(cycles);
+                    interrupt_handle();
+                    if (dma === 1) {
+                        cycles += 160;
+                        dma = 0;
+                    }
+                    if (cycles > 70224) {
+                        cycles -= 70224;
+                        cyc_run -= 70224;
+                        frames += 1;
+                    }
+                }
+                disp_condition(orgpos);
+            }
         }
-    // }
+
+        //draw(XFF00, read);
+
+        //cpu_timestamp = new Date();
+        //console.log(/*cpu_timestamp.getTime() + */" : frame " + frames);
+    } else {
+        console.log("Waiting for key press...");
+    }
     if (!quit) {
-        setTimeout(run_handler, Math.max(next_frame_starts-Date.now(), 0));
+        if (!unthrottled) {
+            let date_now = Date.now();
+            setTimeout(run_handler, Math.max(next_frame_starts-date_now, 0));
+            if (next_frame_starts-date_now < 0) {
+                next_frame_starts = date_now;
+            }
+        }else {
+            setTimeout(run_handler, 0);
+        }
     }
 };
 

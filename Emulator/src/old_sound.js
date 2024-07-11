@@ -255,209 +255,209 @@ function lfsr(XFF) {
     return XFF;
 }
 
-function play_channels(XFF) {
-    let change = 0;
-    //Square Wave 1
-    let freq = XFF[0x13] + ((XFF[0x14] & 0b111) << 8);
-    let duty = (XFF[0x11] & 0b1100_0000) >> 6;
-    let vol = (XFF[0x12] & 0b1111_0000) >> 4;
-    if ((XFF[0x14] & 0b1000_0000) >> 7 === 1 && freq !== 0) {
-        alert("BEEEP! 1");
-         snd_abort = true;
-        let sw1_new = [freq, vol, duty, 1];
-        if ( sw1_new[0] !== sw1_old[0] || sw1_new[1] !== sw1_old[1] || sw1_new[2] !== sw1_old[2] || sw1_new[3] !== sw1_old[3] ) {
-            /*let old_freq = sw1_old[0];
-            old_freq = 131072 / (2048 - old_freq);
-            poly.triggerRelease(old_freq);*/
-            change = 1;
-            sw1_old = sw1_new;
-            freq = 131072 / (2048 - freq);
-            switch (duty) {
-                case 0:
-                    duty = 0.125;
-                    break;
-                case 1:
-                    duty = 0.25;
-                    break;
-                case 2:
-                    duty = 0.5;
-                    break;
-                case 3:
-                    duty = 0.75;
-                    break;
-                default:
-                    alert("Something is up. Do your duty correctly!");
-            }
-            vol = 20 + vol * (30 / 16);
-            //vol = 1 + (1 / 16) * vol;
-            sw1.triggerAttack(freq);
-            sw1.volume.value = vol;
-            //poly.triggerAttack(freq, Tone.now(), vol);
-            if (dump_instr === 1) {
-                console.log("SqWv1 Noise made: freq " + freq);
-            }
-        }
-    } else {
-        if (sw1_old[3] === 1) {
-            change = 1;
-            freq = sw1_old[0];
-            freq = 131072 / (2048 - freq);
-            //poly.triggerRelease(freq);
-            sw1.triggerRelease();
-            sw1.volume.value = 0;
-            sw1_old[3] = 0;
-            if (dump_instr === 1) {
-                console.log("SqWv1 Noise stopped");
-            }
-        }
-    }
-    //Square Wave 2
-    freq = XFF[0x18] + ((XFF[0x19] & 0b111) << 8);
-    if ((XFF[0x19] & 0b1000_0000) >> 7 === 1 && freq !== 0) {
-        alert("BEEEP! 2");
-         snd_abort = true;
-        let duty = (XFF[0x16] & 0b1100_0000) >> 6;
-        let vol = (XFF[0x17] & 0b1111_0000) >> 4;
-        let sw2_new = [freq, vol, duty, 1];
-        if ( sw2_new[0] !== sw2_old[0] || sw2_new[1] !== sw2_old[1] || sw2_new[2] !== sw2_old[2] || sw2_new[3] !== sw2_old[3] ) {
-            /*let old_freq = sw2_old[0];
-            old_freq = 131072 / (2048 - old_freq);
-            poly.triggerRelease(old_freq);*/
-            change = 1;
-            sw2_old = sw2_new;
-            freq = 131072 / (2048 - freq);
-            vol = 20 + vol * (30 / 16);
-            //vol = 1 + (1 / 16) * vol;
-            //sw2 = new Tone.PulseOscillator(freq, duty);
-            sw2.triggerAttack(freq);
-            sw2.volume.value = vol;
-            //poly.triggerAttack(freq, Tone.now(), vol);
-            if (dump_instr === 1) {
-                console.log("SqWv2 Noise made: freq " + freq);
-            }
-        }
-    } else {
-        if (sw2_old[3] === 1) {
-            change = 1;
-            freq = sw2_old[0];
-            freq = 131072 / (2048 - freq);
-            sw2.triggerRelease();
-            sw2.volume.value = 0;
-            //poly.triggerRelease(freq);
-            sw2_old[3] = 0;
-            if (dump_instr === 1) {
-                console.log("SqWv2 Noise stopped");
-            }
-        }
-    }
-    //Wave Table
-    freq = XFF[0x1d] + ((XFF[0x14] & 0b111) << 8);
-    vol = (XFF[0x1c] & 0b0110_0000) >> 5;
-    if ((XFF[0x1e] & 0b1000_0000) >> 7 === 1 && freq !== 0) {
-        alert("BEEEP! T");
-         snd_abort = true;
-        let wt_new = [freq, vol, undefined, 1];
-        if ( wt_new[0] !== wt_old[0] || wt_new[1] !== wt_old[1] || wt_new[3] !== wt_old[3] ) {
-            /*let old_freq = wt_old[0];
-            old_freq = 131072 / (2048 - old_freq);
-            poly.triggerRelease(old_freq);*/
-            change = 1;
-            wt_old = wt_new;
-            freq = 131072 / (2048 - freq);
-            switch (vol) {
-                case 0:
-                    vol = 1 + 0;
-                    break;
-                case 1:
-                    //vol = 5;
-                    vol = 1 + 0.2;
-                    break;
-                case 2:
-                    //vol = 10;
-                    vol = 1 + 0.4;
-                    break;
-                case 3:
-                    //vol = 15;
-                    vol = 1 + 0.6;
-                    break;
-                default:
-                    alert("Something is up. Do your sound volume correctly!");
-            }
-            //vol = vol * (30 / 16); //20 + vol * (30 / 16)
-            //sw1 = new Tone.Synth(); Ancient
-            wt.triggerAttack(freq);
-            wt.volume.value = vol;
-            //poly.triggerAttack(freq, Tone.now(), vol);
-            if (dump_instr === 1) {
-                console.log("WvTbl Noise made: freq " + freq);
-            }
-        }
-    } else {
-        if (wt_old[3] === 1) {
-            change = 1;
-            freq = wt_old[0];
-            freq = 131072 / (2048 - freq);
-            wt.triggerRelease();
-            wt.volume.value = 0;
-            //poly.triggerRelease(freq);
-            wt_old[3] = 0;
-            if (dump_instr === 1) {
-                console.log("WvTbl Noise stopped");
-            }
-        }
-    }
-    //Noise Generator
-    if ((XFF[0x23] & 0b1000_0000) >> 7 === 1) {
-        alert("BEEEP! G");
-         snd_abort = true;
-        /*let r = XFF[0x22] & 0b111;
-        if (r === 0) {
-            r = 0.5;
-        }
-        let s = (XFF[0x22] & 0b1111_0000) >> 4;
-        let freq = 524288 / r / Math.pow(2, s + 1);*/
-        let vol = (XFF[0x17] & 0b1111_0000) >> 4;
-        let ng_new = [0, vol, undefined, 1];
-        if ( ng_new[0] !== ng_old[0] || ng_new[1] !== ng_old[1] || ng_new[3] !== ng_old[3] ) {
-            change = 1;
-            ng_old = ng_new;
-            vol = vol * (30 / 16); //20 + vol * (30 / 16)
-            //ng = new Tone.Noise("white");
-            ng.start();
-            ng.volume.value = vol;
-            if (dump_instr === 1) {
-                console.log("NsGen Noise made");
-            }
-        }
-    } else {
-        if (ng_old[3] === 1) {
-            change = 1;
-            //ng.disconnect(mixer, 0, 0);
-            ng.stop();
-            //ng = undefined;
-            ng.volume.value = 0;
-            ng_old[3] = 0;
-            if (dump_instr === 1) {
-                console.log("NsGen Noise stopped");
-            }
-        }
-    }
+// function play_channels(XFF) {
+//     let change = 0;
+//     //Square Wave 1
+//     let freq = XFF[0x13] + ((XFF[0x14] & 0b111) << 8);
+//     let duty = (XFF[0x11] & 0b1100_0000) >> 6;
+//     let vol = (XFF[0x12] & 0b1111_0000) >> 4;
+//     if ((XFF[0x14] & 0b1000_0000) >> 7 === 1 && freq !== 0) {
+//         alert("BEEEP! 1");
+//         snd_abort = true;
+//         let sw1_new = [freq, vol, duty, 1];
+//         if ( sw1_new[0] !== sw1_old[0] || sw1_new[1] !== sw1_old[1] || sw1_new[2] !== sw1_old[2] || sw1_new[3] !== sw1_old[3] ) {
+//             /*let old_freq = sw1_old[0];
+//             old_freq = 131072 / (2048 - old_freq);
+//             poly.triggerRelease(old_freq);*/
+//             change = 1;
+//             sw1_old = sw1_new;
+//             freq = 131072 / (2048 - freq);
+//             switch (duty) {
+//                 case 0:
+//                     duty = 0.125;
+//                     break;
+//                 case 1:
+//                     duty = 0.25;
+//                     break;
+//                 case 2:
+//                     duty = 0.5;
+//                     break;
+//                 case 3:
+//                     duty = 0.75;
+//                     break;
+//                 default:
+//                     alert("Something is up. Do your duty correctly!");
+//             }
+//             vol = 20 + vol * (30 / 16);
+//             //vol = 1 + (1 / 16) * vol;
+//             sw1.triggerAttack(freq);
+//             sw1.volume.value = vol;
+//             //poly.triggerAttack(freq, Tone.now(), vol);
+//             if (dump_instr === 1) {
+//                 console.log("SqWv1 Noise made: freq " + freq);
+//             }
+//         }
+//     } else {
+//         if (sw1_old[3] === 1) {
+//             change = 1;
+//             freq = sw1_old[0];
+//             freq = 131072 / (2048 - freq);
+//             //poly.triggerRelease(freq);
+//             sw1.triggerRelease();
+//             sw1.volume.value = 0;
+//             sw1_old[3] = 0;
+//             if (dump_instr === 1) {
+//                 console.log("SqWv1 Noise stopped");
+//             }
+//         }
+//     }
+//     //Square Wave 2
+//     freq = XFF[0x18] + ((XFF[0x19] & 0b111) << 8);
+//     if ((XFF[0x19] & 0b1000_0000) >> 7 === 1 && freq !== 0) {
+//         alert("BEEEP! 2");
+//          snd_abort = true;
+//         let duty = (XFF[0x16] & 0b1100_0000) >> 6;
+//         let vol = (XFF[0x17] & 0b1111_0000) >> 4;
+//         let sw2_new = [freq, vol, duty, 1];
+//         if ( sw2_new[0] !== sw2_old[0] || sw2_new[1] !== sw2_old[1] || sw2_new[2] !== sw2_old[2] || sw2_new[3] !== sw2_old[3] ) {
+//             /*let old_freq = sw2_old[0];
+//             old_freq = 131072 / (2048 - old_freq);
+//             poly.triggerRelease(old_freq);*/
+//             change = 1;
+//             sw2_old = sw2_new;
+//             freq = 131072 / (2048 - freq);
+//             vol = 20 + vol * (30 / 16);
+//             //vol = 1 + (1 / 16) * vol;
+//             //sw2 = new Tone.PulseOscillator(freq, duty);
+//             sw2.triggerAttack(freq);
+//             sw2.volume.value = vol;
+//             //poly.triggerAttack(freq, Tone.now(), vol);
+//             if (dump_instr === 1) {
+//                 console.log("SqWv2 Noise made: freq " + freq);
+//             }
+//         }
+//     } else {
+//         if (sw2_old[3] === 1) {
+//             change = 1;
+//             freq = sw2_old[0];
+//             freq = 131072 / (2048 - freq);
+//             sw2.triggerRelease();
+//             sw2.volume.value = 0;
+//             //poly.triggerRelease(freq);
+//             sw2_old[3] = 0;
+//             if (dump_instr === 1) {
+//                 console.log("SqWv2 Noise stopped");
+//             }
+//         }
+//     }
+//     //Wave Table
+//     freq = XFF[0x1d] + ((XFF[0x14] & 0b111) << 8);
+//     vol = (XFF[0x1c] & 0b0110_0000) >> 5;
+//     if ((XFF[0x1e] & 0b1000_0000) >> 7 === 1 && freq !== 0) {
+//         alert("BEEEP! T");
+//          snd_abort = true;
+//         let wt_new = [freq, vol, undefined, 1];
+//         if ( wt_new[0] !== wt_old[0] || wt_new[1] !== wt_old[1] || wt_new[3] !== wt_old[3] ) {
+//             /*let old_freq = wt_old[0];
+//             old_freq = 131072 / (2048 - old_freq);
+//             poly.triggerRelease(old_freq);*/
+//             change = 1;
+//             wt_old = wt_new;
+//             freq = 131072 / (2048 - freq);
+//             switch (vol) {
+//                 case 0:
+//                     vol = 1 + 0;
+//                     break;
+//                 case 1:
+//                     //vol = 5;
+//                     vol = 1 + 0.2;
+//                     break;
+//                 case 2:
+//                     //vol = 10;
+//                     vol = 1 + 0.4;
+//                     break;
+//                 case 3:
+//                     //vol = 15;
+//                     vol = 1 + 0.6;
+//                     break;
+//                 default:
+//                     alert("Something is up. Do your sound volume correctly!");
+//             }
+//             //vol = vol * (30 / 16); //20 + vol * (30 / 16)
+//             //sw1 = new Tone.Synth(); Ancient
+//             wt.triggerAttack(freq);
+//             wt.volume.value = vol;
+//             //poly.triggerAttack(freq, Tone.now(), vol);
+//             if (dump_instr === 1) {
+//                 console.log("WvTbl Noise made: freq " + freq);
+//             }
+//         }
+//     } else {
+//         if (wt_old[3] === 1) {
+//             change = 1;
+//             freq = wt_old[0];
+//             freq = 131072 / (2048 - freq);
+//             wt.triggerRelease();
+//             wt.volume.value = 0;
+//             //poly.triggerRelease(freq);
+//             wt_old[3] = 0;
+//             if (dump_instr === 1) {
+//                 console.log("WvTbl Noise stopped");
+//             }
+//         }
+//     }
+//     //Noise Generator
+//     if ((XFF[0x23] & 0b1000_0000) >> 7 === 1) {
+//         alert("BEEEP! G");
+//          snd_abort = true;
+//         /*let r = XFF[0x22] & 0b111;
+//         if (r === 0) {
+//             r = 0.5;
+//         }
+//         let s = (XFF[0x22] & 0b1111_0000) >> 4;
+//         let freq = 524288 / r / Math.pow(2, s + 1);*/
+//         let vol = (XFF[0x17] & 0b1111_0000) >> 4;
+//         let ng_new = [0, vol, undefined, 1];
+//         if ( ng_new[0] !== ng_old[0] || ng_new[1] !== ng_old[1] || ng_new[3] !== ng_old[3] ) {
+//             change = 1;
+//             ng_old = ng_new;
+//             vol = vol * (30 / 16); //20 + vol * (30 / 16)
+//             //ng = new Tone.Noise("white");
+//             ng.start();
+//             ng.volume.value = vol;
+//             if (dump_instr === 1) {
+//                 console.log("NsGen Noise made");
+//             }
+//         }
+//     } else {
+//         if (ng_old[3] === 1) {
+//             change = 1;
+//             //ng.disconnect(mixer, 0, 0);
+//             ng.stop();
+//             //ng = undefined;
+//             ng.volume.value = 0;
+//             ng_old[3] = 0;
+//             if (dump_instr === 1) {
+//                 console.log("NsGen Noise stopped");
+//             }
+//         }
+//     }
 
-    if (change === 1) {
-        /*mixer = new Tone.Merge().toMaster();
-        if (sw1 !== undefined) {
-            sw1.connect(mixer, 0, 1).start();
-        }
-        if (sw2 !== undefined) {
-            //sw2.connect(mixer, 0, 0).start();
-        }
-        if (ng !== undefined) {
-            ng.connect(mixer, 0, 0).start();
-        }*/
-    }
+//     if (change === 1) {
+//         /*mixer = new Tone.Merge().toMaster();
+//         if (sw1 !== undefined) {
+//             sw1.connect(mixer, 0, 1).start();
+//         }
+//         if (sw2 !== undefined) {
+//             //sw2.connect(mixer, 0, 0).start();
+//         }
+//         if (ng !== undefined) {
+//             ng.connect(mixer, 0, 0).start();
+//         }*/
+//     }
 
-    return XFF;
-}
+//     return XFF;
+// }
 
 //let sine = new Tone.Oscillator(500, "sine");
 //sine.toMaster().start();

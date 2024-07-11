@@ -2,6 +2,8 @@ let dump_instr = 0;
 let cb_abort = false;
 let cb_suspicious = false;
 
+let no_debug = false;
+
 
 let frames = 0;
 let cycles = 0;

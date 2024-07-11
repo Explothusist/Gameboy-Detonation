@@ -429,7 +429,7 @@ function setup(rom) {
             alert("Cartridge: Hudson Hu-C1");
             break;
         default:
-            alert("ERROR: invalid RAM size");
+            alert("ERROR: invalid Cartridge type");
     }
 
     // if (car_type === 5) {
@@ -705,7 +705,9 @@ function write(pos, val, message = 1) {
                     X4000 = rombanks[bank];
                     ////console.log("ROM bank changed to bank " + bank);
                     if (bank !== val) {
-                        alert(val.toString(2) +" written, changed to " + bank.toString(2) +    "\nfirst: " + rombank.toString(2) + " high: " + romhigh.toString(2));
+                        if (!no_debug) {
+                            alert(val.toString(2) +" written, changed to " + bank.toString(2) +    "\nfirst: " + rombank.toString(2) + " high: " + romhigh.toString(2));
+                        }
                         //mem_abort = true;
                     }
                     return;
@@ -720,7 +722,9 @@ function write(pos, val, message = 1) {
                             let bank = rombank + (mod_rom_high << 5);
                             X4000 = rombanks[bank];
                             //console.log("ROM bank changed to bank " + bank);
-                            alert("ROM bank high changed!");
+                            if (!no_debug) {
+                                alert("ROM bank high changed!");
+                            }
                             //mem_abort = true;
                         }
                         return;
