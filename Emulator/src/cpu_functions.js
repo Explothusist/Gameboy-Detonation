@@ -4676,7 +4676,7 @@ function spc_reg(cyc) {
             throw_lcdc = 1;
         }
     } else {
-        // throw_lcdc = 0;
+        throw_lcdc = 0;
     }
     xff41 &= 0b0111_1000;
     xff41 |= mask;
