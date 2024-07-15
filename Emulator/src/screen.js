@@ -780,14 +780,17 @@ function draw_dots(dots, xff, read) {
             }
         }
 
-        dot_on_line += 1;
-        if (dot_on_line >= 456) {
-            dot_on_line = 0;
-
+        if (dot_on_line === 80+screen_width) {
             // End of scanline has been reached; draw the ImageData
             // from the line. No need to clear because it will be 
             // overridden
             ts_ctx.putImageData(scanline_image_data, 0, scanline/**scale*/);
+        }
+
+        dot_on_line += 1;
+        if (dot_on_line >= 456) {
+            dot_on_line = 0;
+
 
             scanline += 1;
             if (scanline >= 154) {
