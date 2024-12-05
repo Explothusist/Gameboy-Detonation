@@ -539,8 +539,33 @@ let sound_registers = [
     0xff, 0x3f, 0x00, 0xff, 0xbf,
     0x7f, 0xff, 0x9f, 0xff, 0xbf,
     0xff, 0xff, 0x00, 0x00, 0xbf,
-    0x00, 0x00, 0x70
+    0x00, 0x00, 0x70,
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 ];
+function clear_all_sound_registers(XFF) {
+    for (let i = 0x10; i < 0x26; i++) {
+        XFF[i] = 0;
+    }
+    return XFF;
+};
+function set_ff26(XFF) {
+    XFF[0x26] &= 0b1111_0000;
+    if ((XFF[0x14] & 0b1000_0000) >> 7) {
+        XFF[0x26] |= 0b0000_0001;
+    }
+    if ((XFF[0x19] & 0b1000_0000) >> 7) {
+        XFF[0x26] |= 0b0000_0010;
+    }
+    if ((XFF[0x1E] & 0b1000_0000) >> 7) {
+        XFF[0x26] |= 0b0000_0100;
+    }
+    if ((XFF[0x23] & 0b1000_0000) >> 7) {
+        XFF[0x26] |= 0b0000_1000;
+    }
+    return XFF;
+};
 function read(pos, message = 1) {
     let dump = mem_dump_instr * message;
     if (pos < 0x4000) {
@@ -640,7 +665,10 @@ function read(pos, message = 1) {
         if (dump === 1) {
             //console.log("I/O Ports read");
         }
-        if (pos >= 0xff10 && pos <= 0xff26) {
+        if (pos === 0xff26) {
+            XFF00 = set_ff26(XFF00);
+        }
+        if (pos >= 0xff10 && pos <= 0xff3f) {
             return (XFF00[pos - 0xff00] | sound_registers[pos - 0xff10]);
         }
         let ret = read_special_registers(frames, cycles, pos);
@@ -668,7 +696,6 @@ function read(pos, message = 1) {
         return XFFFF;
     }
 };
-
 function dma_trans(pos) {
     let addr = pos * 0x100;
     for (let i = 0; i < 0x9f; i++) {
@@ -992,6 +1019,10 @@ function write(pos, val, message = 1) {
                 //DMA Transfer
                 XFF00[0x46] = val;
                 dma_trans(val);
+            } else if (pos >= 0xff10 && pos <= 0xff25) {
+                if (((XFF00[0x26] & 0b1000_0000) >> 7) === 1) {
+                    XFF00[pos - 0xff00] = val;
+                }
             } else {
                 XFF00[pos - 0xff00] = val;
             }
@@ -1006,6 +1037,12 @@ function write(pos, val, message = 1) {
             }
             if (pos === 0xff23) {
                 noise_enable_written = true;
+            }
+
+            if (pos === 0xff26) {
+                if (((val & 0b1000_0000) >> 7) === 0) {
+                    XFF00 = clear_all_sound_registers(XFF00);
+                }
             }
             return;
         } else if (pos < 0xff80) {

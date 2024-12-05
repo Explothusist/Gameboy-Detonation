@@ -1,6 +1,7 @@
 
 let sound = document.getElementById("sound");
 let speed = document.getElementById("speed");
+let volume_level = document.getElementById("volume");
 
 let sq1_toggle = document.getElementById("sq1_toggle");
 let sq2_toggle = document.getElementById("sq2_toggle");
@@ -58,6 +59,8 @@ let process_sq2 = true;
 let process_wave = true;
 let process_noise = true;
 let smooth_sound = true;
+
+let volume_adjustment = 1;
 
 sound.onclick = function () {
     audio_ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000 });
@@ -168,7 +171,7 @@ sound.onclick = function () {
             // Math.random() is in [0; 1.0]
             // audio needs to be in [-1.0; 1.0]
             // nowBuffering[i] = Math.random() * 2 - 1;
-            nowBuffering[i] = Math.sin(i*0.25)*0.25;
+            nowBuffering[i] = Math.sin(i*0.25)*0.25*volume_adjustment;
         }
     }
 
@@ -249,6 +252,11 @@ smooth_snd.addEventListener("change", function () {
             TriggerBufferReset(master.id);
         }
     }
+});
+
+volume_level.addEventListener("change", function () {
+    volume_adjustment = volume_level.valueAsNumber/100;
+    console.log(volume_adjustment);
 });
 
 
@@ -407,6 +415,15 @@ class Square_1 {
         XFF[0x14] |= (value << 6);
         return XFF;
     }
+
+    clear_all(XFF) {
+        XFF[0x10] = 0;
+        XFF[0x11] = 0;
+        XFF[0x12] = 0;
+        XFF[0x13] = 0;
+        XFF[0x14] = 0;
+        return XFF;
+    }
 };
 class Square_2 {
 
@@ -499,6 +516,15 @@ class Square_2 {
         XFF[0x19] |= (value << 6);
         return XFF;
     }
+
+    clear_all(XFF) {
+        XFF[0x15] = 0;
+        XFF[0x16] = 0;
+        XFF[0x17] = 0;
+        XFF[0x18] = 0;
+        XFF[0x19] = 0;
+        return XFF;
+    }
 };
 class Wave_Table {
 
@@ -570,6 +596,14 @@ class Wave_Table {
         XFF[0x1E] &= 0b1011_1111;
         XFF[0x1E] |= (value << 6);
         return XFF;
+    }
+
+    clear_all(XFF) {
+        XFF[0x1A] = 0;
+        XFF[0x1B] = 0;
+        XFF[0x1C] = 0;
+        XFF[0x1D] = 0;
+        XFF[0x1E] = 0;
     }
 };
 let noise_divisors = [8, 16, 32, 48, 64, 80, 96, 112];
@@ -677,6 +711,15 @@ class Noise_Gen {
         XFF[0x23] |= (value << 6);
         return XFF;
     }
+
+    clear_all(XFF) {
+        XFF[0x1F] = 0;
+        XFF[0x20] = 0;
+        XFF[0x21] = 0;
+        XFF[0x22] = 0;
+        XFF[0x23] = 0;
+        return XFF;
+    }
 };
 class Control {
 
@@ -780,6 +823,12 @@ class Control {
         value &= 0b1;
         XFF[0x26] &= 0b0111_1111;
         XFF[0x26] |= (value << 7);
+        return XFF;
+    }
+
+    clear_all(XFF) {
+        XFF[0x24] = 0;
+        XFF[0x25] = 0;
         return XFF;
     }
 };
@@ -1279,7 +1328,7 @@ function reload_channel(channel, XFF) {
     //     case master.id:
 
     // }
-}
+};
 function load_xff(XFF) {
     if (XFF[0x12] !== old_xff[0x12]) {
         
@@ -1344,7 +1393,11 @@ function load_xff(XFF) {
         }
         noise_enable_written = false;
     }
+    if (XFF[0x26] !== old_xff[0x26]) {
+
+    }
     old_xff = Array.from(XFF);
+    return XFF;
 };
 
 
@@ -1533,8 +1586,8 @@ function channel_clocker(cycles, XFF) {
             //     master.cycles -= run_per;
             
             if (control.get_enable(XFF) === 1) {
-                let left_blip = (square_1.left_blip+square_2.left_blip+wave_table.left_blip+noise_gen.left_blip)*0.25;
-                let right_blip = (square_1.right_blip+square_2.right_blip+wave_table.right_blip+noise_gen.right_blip)*0.25;
+                let left_blip = (square_1.left_blip+square_2.left_blip+wave_table.left_blip+noise_gen.left_blip)*0.25*volume_adjustment;
+                let right_blip = (square_1.right_blip+square_2.right_blip+wave_table.right_blip+noise_gen.right_blip)*0.25*volume_adjustment;
                 AddAudioBlip(master.id, left_blip, right_blip, XFF);
             }else {
                 AddAudioBlip(master.id, 0, 0, XFF);

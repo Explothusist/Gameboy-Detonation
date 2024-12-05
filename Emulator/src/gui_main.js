@@ -100,6 +100,8 @@ function setup_edit_game() {};
 function setup_select_game() {};
 function setup_writing_file() {};
 function setup_reading_file() {};
+function setup_reload_emulator() {};
+function setup_options() {};
 // Actions
 function open_directory() {};
 function get_all_files() {};
@@ -119,6 +121,9 @@ function wipe_game_ram() {};
 function trigger_set_keybind() {};
 function set_keybind() {};
 function save_keybinds() {};
+function trigger_change_resolution() {};
+function change_resolution() {};
+function apply_settings() {};
 
 function relinquish_control() {};
 
@@ -134,6 +139,7 @@ let registered_games = [];
 //{name: "Zelda - Link's Awakening", rom_path: "Legend of Zelda, The - Link's Awakening (USA, Europe).gb", ram_path: "ZELDA.gbram", save_state: ["ZELDA_1.gbstate", "ZELDA_2.gbstate", "ZELDA_3.gbstate", "ZELDA_4.gbstate"]}
 // keybindings (from cpu_functions)
 let temp_keybind = Array.from(keybindings);
+let temp_scale = 4;
 
 let rom_path = "";
 let ram_path = "";
@@ -212,11 +218,12 @@ function get_file(filename) {
 
 
 setup_need_directory = function() {
-    m_menu = new Menu("Welcome! Please select the emulator\n    data directory.", ["Select Directory"], [open_directory], [{none:true}]);
+    m_menu = new Menu("Welcome! Please select or create a new\n    emulator data directory.", ["Select Directory"], [open_directory], [{none:true}]);
 };
 setup_main_menu = function() {
-    m_menu = new Menu("Welcome! Select an action.", ["Load Game", "Register New ROM", "Edit Existing Game", "Forget All Games", "Keybindings"], 
-        [setup_load_game, setup_register_rom, setup_edit_game, forget_all, setup_keybindings], [{none:true}, {none:true}, {none:true}, {none:true}, {none:true}]);
+    m_menu = new Menu("Welcome! Select an action.", ["Load Game", "Register New ROM", "Edit Existing Game", "Forget All Games", "Keybindings", "Options"], 
+        [setup_load_game, setup_register_rom, setup_edit_game, forget_all, setup_keybindings, setup_options],
+        [{none:true}, {none:true}, {none:true}, {none:true}, {none:true}, {none:true}]);
 };
 setup_load_game = function() {
     let game_names = [];
@@ -233,11 +240,11 @@ setup_load_game = function() {
     m_menu = new Menu("Select a game to load.", game_names, game_actions, game_args);
 };
 setup_register_rom = function() {
-    m_menu = new Menu("Register New ROM.", ["Select ROM File", "Name: ", "Cancel", "Save"], [select_rom, do_nothing, setup_main_menu, add_registered_game], 
+    m_menu = new Menu("Register New ROM.", ["Select ROM File", "Name: ", "Cancel", "Save"], [select_rom, do_nothing, setup_main_menu, do_nothing], 
         [{none:true}, {none:true}, {none:true}, {none:true}]);
 };
 setup_edit_game = function() {
-    m_menu = new Menu("Select and action.", ["Wipe RAM", "Forget Game"], [setup_select_game, setup_select_game], [{wipe_ram: true, forget: false}, {wipe_ram: false, forget: true}]);
+    m_menu = new Menu("Select an action.", ["Wipe RAM", "Forget Game"], [setup_select_game, setup_select_game], [{wipe_ram: true, forget: false}, {wipe_ram: false, forget: true}]);
 };
 setup_select_game = function(args) {
     let action = undefined;
@@ -273,6 +280,15 @@ setup_writing_file = function() {
 };
 setup_reading_file = function() {
     m_menu = new Menu("Reading files, please wait.\nThis may take a while.", [], [], []);
+};
+setup_reload_emulator = function() {
+    m_menu = new Menu("Game has been registered.\nReload the emulator to continue.", [], [], []);
+};
+setup_options = function(selected=0) {
+    m_menu = new Menu("Options", ["Screen Scale: "+temp_scale, "Cancel", "Apply"],
+        [trigger_change_resolution, setup_main_menu, apply_settings],
+        [{none:true}, {none:true}, {none:true}]);
+    m_menu.selected = selected;
 };
 
 open_directory = function() {
@@ -424,17 +440,10 @@ function save_current_RAM(manual=false) {
     }
 };
 load_game = function(args) {
-    // alert("Select "+registered_games[args.game_id].ram_path+" in /Emulator Data/Save_RAM/");
-    // getFileHandle();
-    // onFileHandleLoad = function(handle) {
-    //     RAMFileHandle = handle;
-    //     save_current_RAM();
-    //     load_game_pt2(args);
-    // };
     setup_reading_file();
     onFileFromDirLoad = function(fileHandle) {
         RAMFileHandle = fileHandle;
-        save_current_RAM();
+        // save_current_RAM();
         load_game_pt2(args);
     };
     getFileHandleFromDirectoryHandle(DirectoryHandle, "Save_RAM", registered_games[args.game_id].ram_path);
@@ -487,7 +496,7 @@ start_game = function() {
         getScreenContext();
         beginLoop();
 
-        save_loop = setInterval(save_current_RAM, 5000);
+        save_loop = setInterval(save_current_RAM, 10000);
     }
 };
 select_rom = function() {
@@ -502,10 +511,12 @@ select_rom_pt2 = function() {
     if (new_rom != undefined) {
         let rom_reader = new FileReader();
         rom_reader.onload = function () {
+            setup_register_rom();
             new_game = {name: "", rom_path: new_rom.name, ram_path:  "", save_state: ["", "", "", "",], ram_size: 1};
             new_rom = new Uint8Array(this.result);
             read_romname(new_rom);
             m_menu.entries[1] = "Name: "+romname;
+            m_menu.entry_effects[3] = add_registered_game;
             new_game.ram_path = romname+".gbram";
             new_game.save_state[0] = romname+"_1.bgstate";
             new_game.save_state[1] = romname+"_2.bgstate";
@@ -563,7 +574,7 @@ add_registered_game_pt3 = function() {
     // onSaveEnd = function() {};
     // saveText(to_save);
     saveInDirectoryComplete = function() {
-        setup_main_menu();
+        setup_reload_emulator();
     };
     saveToFileInDirectory(DirectoryHandle, "Emulator Settings", "registered_games.txt", to_save);
 };
@@ -630,6 +641,22 @@ save_keybinds = function() {
         setup_main_menu();
     };
     saveToFileInDirectory(DirectoryHandle, "Emulator Settings", "keybindings.txt", to_save);
+};
+trigger_change_resolution = function() {
+    m_menu.next_key_grabbed = true;
+    m_menu.on_next_key = change_resolution;
+};
+change_resolution = function(key) {
+    temp_scale = parseInt(key);
+    // console.log(parseInt(key));
+    setup_options(m_menu.selected);
+};
+apply_settings = function() {
+    scale = temp_scale;
+    m_canv.outerHTML = "<canvas width='" + (160 * scale).toString() + "' height='" + (144 * scale).toString() + "' id='display'></canvas>";
+    m_canv = document.getElementById("display");
+    m_ctx = m_canv.getContext("2d");
+    setup_main_menu();
 };
 
 let go = 3;
