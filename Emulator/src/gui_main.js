@@ -225,15 +225,21 @@ setup_main_menu = function() {
         [setup_load_game, setup_register_rom, setup_edit_game, forget_all, setup_keybindings, setup_options],
         [{none:true}, {none:true}, {none:true}, {none:true}, {none:true}, {none:true}]);
 };
-setup_load_game = function() {
+setup_load_game = function(page={pg:0}) {
     let game_names = [];
     let game_actions = [];
     let game_args = [];
-    for (let i = 0; i < registered_games.length; i++) {
+    if (page.pg*8 >= registered_games.length) {
+        page.pg = 0;
+    }
+    for (let i = page.pg*8; i < Math.min(registered_games.length, (page.pg+1)*8); i++) {
         game_names.push(registered_games[i].name);
         game_actions.push(load_game);
         game_args.push({game_id:i});
     }
+    game_names.push("Next Page");
+    game_actions.push(setup_load_game);
+    game_args.push({pg: page.pg+1});
     game_names.push("Back");
     game_actions.push(setup_main_menu);
     game_args.push({none:true});

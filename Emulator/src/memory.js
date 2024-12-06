@@ -41,7 +41,7 @@ let X4000 = new Uint8Array(0x4000); //(ROM Bank)
 let X0000 = new Uint8Array(0x4000); //ROM Bank 0
 
 let rombanks = [];
-for (let i = 0; i < 128; i++) {
+for (let i = 0; i < 256; i++) {
     rombanks.push(new Uint8Array(0x4000));
 }
 let rombank = 1;
@@ -211,6 +211,22 @@ function setup(rom) {
 			
             console.log("128 bank ROM");
             break;
+        case 7:
+            //256 bank
+            for (let i = 0; i < 0x4000; i++) {
+                X0000[i] = rom[i];
+            }
+            offset += 0x4000;
+            for (let j = 1; j < 256; j++) {
+                for (let i = 0; i < 0x4000; i++) {
+                    rombanks[j][i] = rom[i + offset];
+                }
+                offset += 0x4000;
+            }
+            X4000 = rombanks[1];
+			
+            console.log("256 bank ROM");
+            break;
         case 0x52:
             //72 bank
             for (let i = 0; i < 0x4000; i++) {
@@ -260,7 +276,7 @@ function setup(rom) {
             console.log("96 bank ROM");
             break;
         default:
-            alert("ERROR: invalid ROM size");
+            alert("ERROR: invalid ROM size: "+cart_rom_size);
     }
     switch (cart_ram_size) {
         case 0:
@@ -733,7 +749,7 @@ function write(pos, val, message = 1) {
                     ////console.log("ROM bank changed to bank " + bank);
                     if (bank !== val) {
                         if (!no_debug) {
-                            alert(val.toString(2) +" written, changed to " + bank.toString(2) +    "\nfirst: " + rombank.toString(2) + " high: " + romhigh.toString(2));
+                            // alert(val.toString(2) +" written, changed to " + bank.toString(2) +    "\nfirst: " + rombank.toString(2) + " high: " + romhigh.toString(2));
                         }
                         //mem_abort = true;
                     }
@@ -902,7 +918,7 @@ function write(pos, val, message = 1) {
                 }
                 break;
             default:
-                alert("Massive ERROR!?!?!?!?! car_type = " + car_type);
+                // alert("Massive ERROR!?!?!?!?! car_type = " + car_type);
         }
     } else {
         if (pos >= 0x8000 && pos < 0xa000) {
