@@ -51,7 +51,7 @@ let old_ram = {A: 0, B: 0, C: 0, D: 0, E: 0, H: 0, L: 0, Flag: { Z: false, N: fa
 //Timing:     0,1,2,3,4,5,6,7,8,9,A,B,C,D,E,F
 //CB done:    0,1,2,3,4,5,6,7,8,9,A,B,C,D,E,F
 let break_loop = false;
-let interrupts = false;
+let IME = false;
 let interrupts_delayed_true = false;
 let stopped = false;
 let halt = false; //We can ignore Halt
@@ -3764,7 +3764,7 @@ function run0xF2() {
 }
 function run0xF3() {
     //DI
-    interrupts = false;
+    IME = false;
     interrupts_delayed_true = false;
     
     cycles += 4;
@@ -4695,11 +4695,11 @@ function interrupt_handle() {
 
     if (throw_vblank === 1) {
         xff0f += 1;
-        throw_vblank = 0;
-        if (interrupts && (xffff & 1) === 1) {
+        if (IME && (xffff & 1) === 1) {
+            throw_vblank = 0;
             stackpushb16(split_b16(pos));
             pos = 0x40;
-            interrupts = false;
+            IME = false;
             write(0xff0f, xff0f, 0);
             // console.log("V-Blank Interrupt thrown");
             return;
@@ -4707,10 +4707,11 @@ function interrupt_handle() {
     }
     if (throw_lcdc === 1) {
         xff0f += 0b10;
-        throw_lcdc = -1;
-        if (interrupts && (xffff & 0b10) >> 1 === 1) {
+        if (IME && (xffff & 0b10) >> 1 === 1) {
+            throw_lcdc = -1;
             stackpushb16(split_b16(pos));
             pos = 0x48;
+            IME = false;
             write(0xff0f, xff0f, 0);
             // console.log("LCDC Scan Line Interrupt thrown");
             return;
@@ -4718,10 +4719,11 @@ function interrupt_handle() {
     }
     if (throw_timer === 1) {
         xff0f += 0b100;
-        throw_timer = 0;
-        if (interrupts && (xffff & 0b100) >> 2 === 1) {
+        if (IME && (xffff & 0b100) >> 2 === 1) {
+            throw_timer = 0;
             stackpushb16(split_b16(pos));
             pos = 0x50;
+            IME = false;
             write(0xff0f, xff0f, 0);
             // console.log("Timer Overflow Interrupt thrown");
             return;
@@ -4730,10 +4732,11 @@ function interrupt_handle() {
     //throw serial transfer complete (ingored)
     if (throw_pchange === 1) {
         xff0f += 0b100;
-        throw_pchange = 0;
-        if (interrupts && (xffff & 0b1_0000) >> 4 === 1) {
+        if (IME && (xffff & 0b1_0000) >> 4 === 1) {
+            throw_pchange = 0;
             stackpushb16(split_b16(pos));
             pos = 0x60;
+            IME = false;
             write(0xff0f, xff0f, 0);
             // console.log("Key Input High-to-Low Interrupt thrown");
             return;
@@ -4774,7 +4777,7 @@ function disp_condition(orgpos) {
     super_string += "<br>0xFF45 LYC Compare: " + read(0xff45, 0);
     super_string += "<br>0xFF0F Interrupts Thrown: 0x" + read(0xff0f, 0).toString(2).padStart(8, "0");
     super_string += "<br>0xFFFF Interrupt Enable: 0x" + read(0xffff, 0).toString(2).padStart(8, "0");
-    super_string += "<br>Master Interrupt Enable Register: " + interrupts;
+    super_string += "<br>Master Interrupt Enable Register: " + IME;
     super_string += "<br>Square Wave 1: 0xFF10 0x" + read(0xff10, 0).toString(2).padStart(8, "0");
     super_string += "    0xFF11: 0x" + read(0xff11, 0).toString(2).padStart(8, "0");
     super_string += "    0xFF12: 0x" + read(0xff12, 0).toString(2).padStart(8, "0");
@@ -4948,7 +4951,7 @@ function timing_handler(cyc_run) {
                     spc_reg(cycles);
                     interrupt_handle();
                     if (interrupts_delayed_true) {
-                        interrupts = true;
+                        IME = true;
                         interrupts_delayed_true = false;
                     }
                     draw_dots(cycles-old_cycles, XFF00, read);

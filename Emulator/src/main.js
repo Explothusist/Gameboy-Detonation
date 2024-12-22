@@ -132,17 +132,6 @@ engage.onclick = function () {
 //     // }
 // };
 
-function load_ram_data(ram) {
-    let counter = 0;
-    for (let i = 0; i < 16; i++) {
-        for (var j = 0; j < rambanks[i].length; j++) {
-            rambanks[i][j] = ram[counter];
-            counter += 1;
-        }
-    }
-    XA000 = rambanks[rambank];
-};
-
 let repeat = false;
 
 load.onclick = function () {
@@ -170,12 +159,7 @@ load.onclick = function () {
 };
 
 savenewram.onclick = function() {
-    let to_save = [];
-    rambanks[pram] = XA000;
-    for (let i = 0; i < rambanks.length; i++) {
-        to_save.push(rambanks[i]);
-    }
-    saveRAM(to_save);
+    saveRAM(get_ram_to_save());
 };
 
 prepare.onclick = function () {

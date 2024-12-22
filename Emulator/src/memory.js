@@ -719,7 +719,7 @@ function dma_trans(pos) {
     }
     dma = 1;
     //console.log("DMA Transfer Complete");
-}
+};
 function write(pos, val, message = 1) {
     let dump = mem_dump_instr * message;
     if (pos < 0x8000) {
@@ -957,6 +957,7 @@ function write(pos, val, message = 1) {
                     }
                 }
             }
+            console.log("Cartridge RAM Written");
             return;
         } else if (pos < 0xe000) {
             //Internal RAM
@@ -1088,14 +1089,14 @@ function write(pos, val, message = 1) {
             return;
         }
     }
-}
+};
 
 let z = 0;
 function read_unpack(unpack) {
     let ret = unpack[z];
     z++;
     return ret;
-}
+};
 
 function load_state(unpack, modz) {
     z = modz;
@@ -1123,4 +1124,33 @@ function load_state(unpack, modz) {
     for (var i = 0; i < 0x7f; i++) {
         XFF80[i] = read_unpack(unpack);
     }
-}
+};
+
+function get_ram_to_save() {
+    let to_save = [];
+    if (car_type !== 2) {
+        for (let i = 0; i < Math.min(rambanks.length, ram_size); i++) {
+            to_save.push(rambanks[i]);
+        }
+    }else {
+        let tiny_ram = XA000.slice(0, 512);
+        to_save.push(tiny_ram);
+    }
+    return to_save;
+};
+function load_ram_data(ram) {
+    if (car_type !== 2) {
+        let counter = 0;
+        for (let i = 0; i < 16; i++) {
+            for (var j = 0; j < rambanks[i].length; j++) {
+                rambanks[i][j] = ram[counter];
+                counter += 1;
+            }
+        }
+        XA000 = rambanks[rambank];
+    }else {
+        for (let i = 0; i < 512; i++) {
+            XA000[i] = ram[i];
+        }
+    }
+};

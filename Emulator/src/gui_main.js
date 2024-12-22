@@ -394,16 +394,6 @@ function read_ram_size(rom) {
             return 16;
     }
 };
-function load_ram_data(ram) {
-    let counter = 0;
-    for (let i = 0; i < ram_size; i++) {
-        for (var j = 0; j < rambanks[i].length; j++) {
-            rambanks[i][j] = ram[counter];
-            counter += 1;
-        }
-    }
-    XA000 = rambanks[rambank];
-};
 function save_current_RAM(manual=false) {
     rambanks[pram] = XA000;
     let any_non_zero = false;
@@ -430,10 +420,6 @@ function save_current_RAM(manual=false) {
 		}
     }
     if (!ram_not_trusted || force_ram_trusted) {
-        let to_save = [];
-        for (let i = 0; i < Math.min(rambanks.length, ram_size); i++) {
-            to_save.push(rambanks[i]);
-        }
 		if (manual) {
 			fileWritten = function() {
 				alert("RAM Data write complete");
@@ -442,7 +428,7 @@ function save_current_RAM(manual=false) {
 		}else {
 			fileWritten = function() {};
 		}
-        writeFile(RAMFileHandle, to_save);
+        writeFile(RAMFileHandle, get_ram_to_save());
     }
 };
 load_game = function(args) {
@@ -562,7 +548,12 @@ add_registered_game_pt2 = function() {
         saveInDirectoryComplete = function() {
             add_registered_game_pt3();
         };
-        createFileInDirectory(DirectoryHandle, "Save_RAM", new_game.ram_path, new Uint8Array(0x2000 * new_game.ram_size));
+        // if (car_type !== 2) {
+        //     createFileInDirectory(DirectoryHandle, "Save_RAM", new_game.ram_path, new Uint8Array(0x2000 * new_game.ram_size));
+        // } else {
+        //     createFileInDirectory(DirectoryHandle, "Save_RAM", new_game.ram_path, new Uint8Array(512));
+        // }
+        createFileInDirectory(DirectoryHandle, "Save_RAM", new_game.ram_path, get_ram_to_save());
     }else {
         add_registered_game_pt3();
     }
