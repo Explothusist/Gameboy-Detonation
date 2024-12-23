@@ -4333,6 +4333,7 @@ let keyst = 0;
 let keyse = 0;
 
 let xff04 = 0;
+let last_increment = 0;
 let xff05 = 0;
 
 let old_stat = 0;
@@ -4591,42 +4592,57 @@ function poll_joysticks() {
 	}
 };
 
-function spc_reg(cyc) {
+function spc_reg(cyc, new_cyc) {
     //0xFF00 I/O Ports
     // Handled on read
 
     //0xFF01 Serial IO data (ignored)
     //0xFF02 Serial IO control (ignored)
     //0xFF04 DIV timer
-    xff04 += cyc/64;
-    if (xff04 > 256) {
-        xff04 -= 256;
+    xff04 += new_cyc/4;
+    while (xff04 > 16384) {
+        xff04 -= 16384;
+        last_increment -= 16384;
     }
-    XFF00[0x04] = Math.floor(xff04);
+    XFF00[0x04] = (xff04 & 11_1111_1100_0000) >> 6;
 
     //0xFF05 TIMA interrupt timer
     if ((XFF00[0x07] & 0b100) >> 2 === 1) {
+        let increment = 0;
         switch (XFF00[0x07] & 0b11) {
             case 0:
-                xff05 += cyc/256;
+                increment = 256;
                 break;
             case 1:
-                xff05 += cyc/4;
+                increment = 4;
                 break;
             case 2:
-                xff05 += cyc/16;
+                increment = 16;
                 break;
             case 3:
-                xff05 += cyc/64;
+                increment = 64;
                 break;
             default:
                 alert("The laws of magic are breaking down.");
+        }
+        let counter = 1000;
+        while (last_increment+increment < xff04) {
+            last_increment += increment;
+            xff05 += 1;
+
+            counter -= 1;
+            if (counter === 0) {
+                alert("Loop overrun");
+                break;
+            }
         }
         if (xff05 >= 256) {
             xff05 -= 256 - read(0xff06, 0);
             throw_timer = 1;
         }
-        XFF00[0x05] = Math.floor(xff05);
+        XFF00[0x05] = xff05;
+    }else {
+        last_increment = xff04;
     }
     //0xFF06 TIMA timer reset value
     //0xFF07 TIMA timer settings
@@ -4698,7 +4714,6 @@ function interrupt_handle() {
     let xffff = read(0xffff, 0);
 
     if (throw_vblank === 1 || (xff0f & 1) === 1) {
-    // if (throw_vblank === 1) {
         if (IME && (xffff & 1) === 1) {
             xff0f &= 0b0001_1110;
             throw_vblank = 0;
@@ -4709,14 +4724,10 @@ function interrupt_handle() {
             // console.log("V-Blank Interrupt thrown");
             stopped = false;
         }else {
-        // }else if (throw_vblank === 1) {
             xff0f |= 0b0000_0001;
-        // }else {
-            // xff0f &= 0b0001_1110;
         }
     }
     if (throw_lcdc === 1 || ((xff0f & 0b10) >> 1) === 1) {
-    // if (throw_lcdc === 1) {
         if (IME && ((xffff & 0b10) >> 1) === 1) {
             xff0f &= 0b0001_1101;
             throw_lcdc = -1;
@@ -4727,14 +4738,10 @@ function interrupt_handle() {
             // console.log("LCDC Scan Line Interrupt thrown");
             stopped = false;
         }else {
-        // }else if (throw_lcdc === 1) {
             xff0f |= 0b0000_0010;
-        // }else {
-            // xff0f &= 0b0001_1101;
         }
     }
     if (throw_timer === 1 || ((xff0f & 0b100) >> 2) === 1) {
-    // if (throw_timer === 1) {
         if (IME && ((xffff & 0b100) >> 2) === 1) {
             xff0f &= 0b0001_1011;
             throw_timer = 0;
@@ -4745,10 +4752,7 @@ function interrupt_handle() {
             // console.log("Timer Overflow Interrupt thrown");
             stopped = false;
         }else {
-        // }else if (throw_timer === 1) {
             xff0f |= 0b0000_0100;
-        // }else {
-            // xff0f &= 0b0001_1011;
         }
     }
     //throw serial transfer complete (ingored)
@@ -4766,7 +4770,6 @@ function interrupt_handle() {
         }
     }
     if (throw_pchange === 1 || ((xff0f & 0b1_0000) >> 4) === 1) {
-    // if (throw_pchange === 1) {
         if (IME && ((xffff & 0b1_0000) >> 4) === 1) {
             xff0f &= 0b0000_1111;
             throw_pchange = 0;
@@ -4777,14 +4780,9 @@ function interrupt_handle() {
             // console.log("Key Input High-to-Low Interrupt thrown");
             stopped = false;
         }else {
-        // }else if (throw_pchange === 1) {
             xff0f |= 0b0001_0000;
-        // }else {
-            // xff0f &= 0b0000_1111;
         }
     }
-    
-    // xff0f = 0;
 
     write(0xff0f, xff0f, 0);
 }
@@ -4853,6 +4851,8 @@ function disp_condition(orgpos) {
 
 function cpu_cycle(single) {
     if (!stopped) {
+        let old_cycles = cycles;
+
         single = single || false;
         let orgpos = pos;
         if (err_log_en && !no_debug) {
@@ -4882,7 +4882,7 @@ function cpu_cycle(single) {
 
         if (single) {
             disp_condition(orgpos);
-            spc_reg(cycles);
+            spc_reg(cycles, cycles-old_cycles);
             interrupt_handle();
             if (dma === 1) {
                 cycles += 160;
@@ -4991,7 +4991,7 @@ function timing_handler(cyc_run) {
                     let old_cycles = cycles;
                     cpu_cycle();
 
-                    spc_reg(cycles);
+                    spc_reg(cycles, cycles-old_cycles);
                     interrupt_handle();
                     if (interrupts_delayed_true) {
                         IME = true;
@@ -5069,10 +5069,11 @@ function timing_handler(cyc_run) {
                     let orgpos = pos;
                     let ffs = -1;
                     while (ffs < cycles % 456) {
+                        let old_cycles = cycles;
                         ffs = cycles % 456;
                         orgpos = pos;
                         cpu_cycle();
-                        spc_reg(cycles);
+                        spc_reg(cycles, cycles-old_cycles);
                         interrupt_handle();
                         if (dma === 1) {
                             cycles += 160;
@@ -5089,9 +5090,10 @@ function timing_handler(cyc_run) {
                     let orgpos = 0;
                     cyc_run += cycles;
                     while (cycles < cyc_run) {
+                        let old_cycles = cycles;
                         orgpos = pos;
                         cpu_cycle();
-                        spc_reg(cycles);
+                        spc_reg(cycles, cycles-old_cycles);
                         interrupt_handle();
                         if (dma === 1) {
                             cycles += 160;
@@ -5113,7 +5115,7 @@ function timing_handler(cyc_run) {
             //console.log(/*cpu_timestamp.getTime() + */" : frame " + frames);
         } else {
             // console.log("Waiting for key press...");
-            spc_reg(cycles);
+            spc_reg(cycles, 4);
             interrupt_handle();
         }
         if (!unthrottled && next_frame_starts < Date.now()) {

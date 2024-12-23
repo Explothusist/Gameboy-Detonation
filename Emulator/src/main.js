@@ -177,7 +177,7 @@ prepare.onclick = function () {
     window.alert = function () {
         //console.log("1");
         if (go === 3) {
-            console.log("2");
+            // console.log("2");
             if (stop_on_err) {
                 go = 2;
                 console.log("3");
@@ -187,9 +187,9 @@ prepare.onclick = function () {
                 console.log("5");
                 stoprightnow = stop_on_err;
             }
-            console.log("6");
+            // console.log("6");
             _old_alert.apply(window, arguments);
-            console.log("7");
+            // console.log("7");
         } else {
             _old_alert.apply(window, arguments);
         }

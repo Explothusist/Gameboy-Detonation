@@ -256,7 +256,7 @@ smooth_snd.addEventListener("change", function () {
 
 volume_level.addEventListener("change", function () {
     volume_adjustment = volume_level.valueAsNumber/100;
-    console.log(volume_adjustment);
+    // console.log(volume_adjustment);
 });
 
 
@@ -1137,7 +1137,7 @@ function TriggerBufferReset(channel, XFF) {
             noise_gen.time_mod = 1;
             // let hz4 = (524288/Math.max(noise_gen.get_divisor_code(XFF), 0.5))/Math.pow(2, noise_gen.get_clock_shift(XFF)+1);
             let hz4 = 4194304/(noise_gen.get_divisor(XFF) << noise_gen.get_clock_shift(XFF));
-            console.log(hz4);
+            // console.log(hz4);
             
             // hz4 *= (full_speed/ms_per_cycle)*0.97;
             if (smooth_sound) {
@@ -1154,7 +1154,7 @@ function TriggerBufferReset(channel, XFF) {
                     }
                 }
 
-                console.log(noise_gen.time_mod);
+                // console.log(noise_gen.time_mod);
                 
                 noise_buffer = audio_ctx.createBuffer(2, Math.round(hz4*noise_gen.time_mod), Math.round(hz4*noise_gen.time_mod));
             }else {
@@ -1171,7 +1171,7 @@ function TriggerBufferReset(channel, XFF) {
             noise_gen.lfsr = 0;
             
             // console.log(noise_gen.volume, "QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ");
-            console.log("LOOK AT MEEEEEEEEEEEE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+            // console.log("LOOK AT MEEEEEEEEEEEE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
             
             break;
         case master.id:
@@ -1184,7 +1184,7 @@ function TriggerBufferReset(channel, XFF) {
             master_buffer_right_data = master_buffer.getChannelData(1);
             master.started = false;
             master_buffer_pos = 0;
-            console.log("Master Stream Reloaded");
+            // console.log("Master Stream Reloaded");
             break;
     }
 };
@@ -1196,7 +1196,7 @@ function TriggerAudioChannel(channel, XFF) {
                 square_1_source_node.disconnect();
             }
             catch (err) {}
-            console.log("SqWv1 Audio Setup, frequency: "+square_1.get_frequency(XFF)+", duty: "+square_1.get_duty(XFF));
+            // console.log("SqWv1 Audio Setup, frequency: "+square_1.get_frequency(XFF)+", duty: "+square_1.get_duty(XFF));
             square_1_source_node = audio_ctx.createBufferSource();
             square_1_source_node.buffer = square_1_buffer;
             // square_1_source_node.connect(audio_merger);
@@ -1210,7 +1210,7 @@ function TriggerAudioChannel(channel, XFF) {
                 square_2_source_node.disconnect();
             }
             catch (err) {}
-            console.log("SqWv2 Audio Setup, frequency: "+square_2.get_frequency(XFF)+", duty: "+square_2.get_duty(XFF));
+            // console.log("SqWv2 Audio Setup, frequency: "+square_2.get_frequency(XFF)+", duty: "+square_2.get_duty(XFF));
             square_2_source_node = audio_ctx.createBufferSource();
             square_2_source_node.buffer = square_2_buffer;
             // square_2_source_node.connect(audio_merger);
@@ -1224,7 +1224,7 @@ function TriggerAudioChannel(channel, XFF) {
                 wave_table_source_node.disconnect();
             }
             catch (err) {}
-            console.log("WvTbl Audio Setup, frequency: "+wave_table.get_frequency(XFF));
+            // console.log("WvTbl Audio Setup, frequency: "+wave_table.get_frequency(XFF));
             wave_table_source_node = audio_ctx.createBufferSource();
             wave_table_source_node.buffer = wave_table_buffer;
             // wave_table_source_node.connect(audio_merger);
@@ -1238,7 +1238,7 @@ function TriggerAudioChannel(channel, XFF) {
                 noise_source_node.disconnect();
             }
             catch (err) {}
-            console.log("Noise Audio Setup");
+            // console.log("Noise Audio Setup");
             noise_source_node = audio_ctx.createBufferSource();
             noise_source_node.buffer = noise_buffer;
             // noise_source_node.connect(audio_merger);
@@ -1246,16 +1246,16 @@ function TriggerAudioChannel(channel, XFF) {
             noise_source_node.connect(noise_toggle);
             noise_source_node.start();
             noise_gen.started = true;
-            console.log(noise_buffer_left_data);
-            console.log(noise_buffer_right_data);
-            console.log("LOOK HEREEEEEEEEEEEEE??????????????????????????????????????????????????????????????????????????????");
+            // console.log(noise_buffer_left_data);
+            // console.log(noise_buffer_right_data);
+            // console.log("LOOK HEREEEEEEEEEEEEE??????????????????????????????????????????????????????????????????????????????");
             break;
         case master.id:
             try {
                 master_source_node.disconnect();
             }
             catch (err) {}
-            console.log("Master Stream Started");
+            // console.log("Master Stream Started");
             master_source_node = audio_ctx.createBufferSource();
             master_source_node.buffer = master_buffer;
             master_source_node.connect(audio_ctx.destination);
@@ -1427,7 +1427,7 @@ function channel_clocker(cycles, XFF) {
 
                     if (ms_per_cycle/watchdog_ms_per_cycle < 0.90 || ms_per_cycle/watchdog_ms_per_cycle > 1.10) {
                         ms_per_cycle = watchdog_ms_per_cycle;
-                        console.log("Watchdog!");
+                        // console.log("Watchdog!");
                     }
                     
                     speed.innerHTML = "<h3> Speed: " + (Math.round(full_speed/ms_per_cycle*100)) + "%</h3>" + "<h3> (Watchdog): " + (Math.round(full_speed/watchdog_ms_per_cycle*100)) + "%</h3>";
@@ -1617,7 +1617,7 @@ function length_counter(XFF) {
         if (square_1.length_counter >= 64) {
             XFF = square_1.set_enable(XFF, 0);
             // if (dump_instr === 1) {
-                console.log("SqWv1 Length counter triggered ------- SHUT OFF");
+                // console.log("SqWv1 Length counter triggered ------- SHUT OFF");
             // }
             length = 0;
         }
@@ -1629,7 +1629,7 @@ function length_counter(XFF) {
         if (square_2.length_counter >= 64) {
             XFF = square_2.set_enable(XFF, 0);
             // if (dump_instr === 1) {
-                console.log("SqWv2 Length counter triggered shut off " + length);
+                // console.log("SqWv2 Length counter triggered shut off " + length);
             // }
         }
         // console.log("SqWv2 Length counter triggered");
@@ -1640,7 +1640,7 @@ function length_counter(XFF) {
         if (wave_table.length_counter >= 256) {
             XFF = wave_table.set_enable(XFF, 0);
             // if (dump_instr === 1) {
-                console.log("WvTbl Length counter triggered shut off " + length);
+                // console.log("WvTbl Length counter triggered shut off " + length);
             // }
         }
         // console.log("WvTbl Length counter triggered: length " + length);
@@ -1651,8 +1651,8 @@ function length_counter(XFF) {
         if (noise_gen.length_counter >= 64) {
             XFF = noise_gen.set_enable(XFF, 0);
             // if (dump_instr === 1) {
-                console.log("NsGen Length counter triggered shut off " + length);
-                console.log(noise_buffer_pos);
+                // console.log("NsGen Length counter triggered shut off " + length);
+                // console.log(noise_buffer_pos);
             // }
         }
         // console.log("NsGen Length counter triggered: length " + length);
@@ -1675,7 +1675,7 @@ function sweep(XFF) {
             if (square_1.get_sweep_period(XFF) === 0 || square_1.get_shift(XFF) === 0) {
                 XFF = square_1.set_enable(XFF, 0);
                 // if (dump_instr === 1) {
-                    console.log("SqWv1 Disabled: Sweep");
+                    // console.log("SqWv1 Disabled: Sweep");
                 // }
             }
             // Should use shadow_frequency, but...
@@ -1689,7 +1689,7 @@ function sweep(XFF) {
                 freq += shadow_freq;
                 if (freq > 2047) {
                     XFF = square_1.set_enable(XFF, 0);
-                    console.log("SqWv1 Disabled: Sweep");
+                    // console.log("SqWv1 Disabled: Sweep");
                 } else {
                     XFF = square_1.set_frequency(XFF, freq);
                 }
