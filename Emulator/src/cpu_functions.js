@@ -4598,7 +4598,11 @@ function spc_reg(cyc) {
     //0xFF01 Serial IO data (ignored)
     //0xFF02 Serial IO control (ignored)
     //0xFF04 DIV timer
-    // Handled on read
+    xff04 += cyc/64;
+    if (xff04 > 256) {
+        xff04 -= 256;
+    }
+    XFF00[0x04] = Math.floor(xff04);
 
     //0xFF05 TIMA interrupt timer
     if ((XFF00[0x07] & 0b100) >> 2 === 1) {
@@ -4690,58 +4694,97 @@ function spc_reg(cyc) {
 };
 
 function interrupt_handle() {
-    let xff0f = 0;
+    let xff0f = read(0xff0f, 0);
     let xffff = read(0xffff, 0);
 
-    if (throw_vblank === 1) {
-        xff0f += 1;
+    if (throw_vblank === 1 || (xff0f & 1) === 1) {
+    // if (throw_vblank === 1) {
         if (IME && (xffff & 1) === 1) {
+            xff0f &= 0b0001_1110;
             throw_vblank = 0;
             stackpushb16(split_b16(pos));
             pos = 0x40;
             IME = false;
-            write(0xff0f, xff0f, 0);
+            interrupts_delayed_true = false;
             // console.log("V-Blank Interrupt thrown");
-            return;
+            stopped = false;
+        }else {
+        // }else if (throw_vblank === 1) {
+            xff0f |= 0b0000_0001;
+        // }else {
+            // xff0f &= 0b0001_1110;
         }
     }
-    if (throw_lcdc === 1) {
-        xff0f += 0b10;
-        if (IME && (xffff & 0b10) >> 1 === 1) {
+    if (throw_lcdc === 1 || ((xff0f & 0b10) >> 1) === 1) {
+    // if (throw_lcdc === 1) {
+        if (IME && ((xffff & 0b10) >> 1) === 1) {
+            xff0f &= 0b0001_1101;
             throw_lcdc = -1;
             stackpushb16(split_b16(pos));
             pos = 0x48;
             IME = false;
-            write(0xff0f, xff0f, 0);
+            interrupts_delayed_true = false;
             // console.log("LCDC Scan Line Interrupt thrown");
-            return;
+            stopped = false;
+        }else {
+        // }else if (throw_lcdc === 1) {
+            xff0f |= 0b0000_0010;
+        // }else {
+            // xff0f &= 0b0001_1101;
         }
     }
-    if (throw_timer === 1) {
-        xff0f += 0b100;
-        if (IME && (xffff & 0b100) >> 2 === 1) {
+    if (throw_timer === 1 || ((xff0f & 0b100) >> 2) === 1) {
+    // if (throw_timer === 1) {
+        if (IME && ((xffff & 0b100) >> 2) === 1) {
+            xff0f &= 0b0001_1011;
             throw_timer = 0;
             stackpushb16(split_b16(pos));
             pos = 0x50;
             IME = false;
-            write(0xff0f, xff0f, 0);
+            interrupts_delayed_true = false;
             // console.log("Timer Overflow Interrupt thrown");
-            return;
+            stopped = false;
+        }else {
+        // }else if (throw_timer === 1) {
+            xff0f |= 0b0000_0100;
+        // }else {
+            // xff0f &= 0b0001_1011;
         }
     }
     //throw serial transfer complete (ingored)
-    if (throw_pchange === 1) {
-        xff0f += 0b100;
-        if (IME && (xffff & 0b1_0000) >> 4 === 1) {
+    if (((xff0f & 0b1000) >> 3) === 1) {
+        if (IME && ((xffff & 0b1000) >> 3) === 1) {
+            xff0f &= 0b0001_0111;
+            stackpushb16(split_b16(pos));
+            pos = 0x58;
+            IME = false;
+            interrupts_delayed_true = false;
+            // console.log("Timer Overflow Interrupt thrown");
+            stopped = false;
+        }else {
+            xff0f |= 0b0000_1000;
+        }
+    }
+    if (throw_pchange === 1 || ((xff0f & 0b1_0000) >> 4) === 1) {
+    // if (throw_pchange === 1) {
+        if (IME && ((xffff & 0b1_0000) >> 4) === 1) {
+            xff0f &= 0b0000_1111;
             throw_pchange = 0;
             stackpushb16(split_b16(pos));
             pos = 0x60;
             IME = false;
-            write(0xff0f, xff0f, 0);
+            interrupts_delayed_true = false;
             // console.log("Key Input High-to-Low Interrupt thrown");
-            return;
+            stopped = false;
+        }else {
+        // }else if (throw_pchange === 1) {
+            xff0f |= 0b0001_0000;
+        // }else {
+            // xff0f &= 0b0000_1111;
         }
     }
+    
+    // xff0f = 0;
 
     write(0xff0f, xff0f, 0);
 }
@@ -4854,7 +4897,7 @@ function cpu_cycle(single) {
             draw(XFF00, read);
         }
     } else {
-        alert("Waiting for key press...");
+        alert("Waiting for interrupt...");
     }
 };
 
@@ -5069,7 +5112,9 @@ function timing_handler(cyc_run) {
             //cpu_timestamp = new Date();
             //console.log(/*cpu_timestamp.getTime() + */" : frame " + frames);
         } else {
-            console.log("Waiting for key press...");
+            // console.log("Waiting for key press...");
+            spc_reg(cycles);
+            interrupt_handle();
         }
         if (!unthrottled && next_frame_starts < Date.now()) {
             next_frame_starts = Date.now()-1;

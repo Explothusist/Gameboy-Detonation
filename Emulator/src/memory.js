@@ -503,12 +503,13 @@ function read_special_registers(curr_frame, curr_cyc, pos) {
     }
     //0xFF01 Serial IO data (ignored)
     //0xFF02 Serial IO control (ignored)
-    //0xFF04 DIV timer
-    if (pos === xff04) {
-        xff04 += (((curr_frame-DIV_last_reset.frame)*5280)+((curr_cyc-DIV_last_reset.cycle)) * 0.00397558594) % 256;
-        XFF00[0x04] = Math.floor(xff04);
-        return xff04;
-    }
+    // //0xFF04 DIV timer
+    // if (pos === xff04) {
+    // //     xff04 += (((curr_frame-DIV_last_reset.frame)*5280)+((curr_cyc-DIV_last_reset.cycle)) * 0.00397558594) % 256;
+    // //     XFF00[0x04] = Math.floor(xff04);
+    //     return Math.floor(XFF00[0x04]);
+    // }
+
     //0xFF05 TIMA interrupt timer
     // Handled periodically
 
@@ -957,7 +958,7 @@ function write(pos, val, message = 1) {
                     }
                 }
             }
-            console.log("Cartridge RAM Written");
+            // console.log("Cartridge RAM Written");
             return;
         } else if (pos < 0xe000) {
             //Internal RAM
