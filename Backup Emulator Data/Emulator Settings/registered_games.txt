@@ -1,3 +1,0 @@
-{"name":"ZELDA","rom_path":"Legend of Zelda, The - Link's Awakening (USA, Europe).gb","ram_path":"ZELDA.gbram","save_state":["ZELDA_1.bgstate","ZELDA_2.bgstate","ZELDA_3.bgstate","ZELDA_4.bgstate"]}
-{"name":"METROID2","rom_path":"Metroid II - Return of Samus (World).gb","ram_path":"METROID2.gbram","save_state":["METROID2_1.bgstate","METROID2_2.bgstate","METROID2_3.bgstate","METROID2_4.bgstate"]}
-{"name":"POKEMON RED","rom_path":"Pokemon Red.gb","ram_path":"POKEMON RED.gbram","save_state":["POKEMON RED_1.bgstate","POKEMON RED_2.bgstate","POKEMON RED_3.bgstate","POKEMON RED_4.bgstate"]}
