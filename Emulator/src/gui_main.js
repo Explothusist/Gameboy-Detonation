@@ -345,7 +345,7 @@ read_directory = function() {
         let keybind_reader = new FileReader();
         keybind_reader.onload = function () {
             let keys = this.result.split(/\r?\n/);
-            for (let i = 0; i < keys.length; i++) {
+            for (let i = 0; i < keybindings.length; i++) {
                 keybindings[i] = keys[i];
                 temp_keybind[i] = keys[i];
             }
