@@ -4343,6 +4343,8 @@ let throw_lcdc = 0; //to do only once: 0 can be called, 1 is called, -1 just cal
 let throw_timer = 0;
 let throw_pchange = 0;
 
+let old_xff0f = 0;
+
 function check_sus() {
     if (suspicious) {
         //Check RAM Activation
@@ -4713,7 +4715,9 @@ function interrupt_handle() {
     let xff0f = read(0xff0f, 0);
     let xffff = read(0xffff, 0);
 
-    if (throw_vblank === 1 || (xff0f & 1) === 1) {
+    let new_xff0f = ((xff0f ^ old_xff0f) & xff0f);
+
+    if (throw_vblank === 1 || (new_xff0f & 1) === 1) {
         throw_vblank = 0;
         if (IME && (xffff & 1) === 1) {
             xff0f &= 0b0001_1110;
@@ -4724,10 +4728,12 @@ function interrupt_handle() {
             // console.log("V-Blank Interrupt thrown");
             stopped = false;
         }else {
-            // xff0f |= 0b0000_0001;
+            xff0f |= 0b0000_0001;
         }
+    }else {
+        xff0f &= 0b0001_1110;
     }
-    if (throw_lcdc === 1 || ((xff0f & 0b10) >> 1) === 1) {
+    if (throw_lcdc === 1 || ((new_xff0f & 0b10) >> 1) === 1) {
         if (IME && ((xffff & 0b10) >> 1) === 1) {
             xff0f &= 0b0001_1101;
             throw_lcdc = -1;
@@ -4740,8 +4746,10 @@ function interrupt_handle() {
         }else {
             xff0f |= 0b0000_0010;
         }
+    }else {
+        xff0f &= 0b0001_1101;
     }
-    if (throw_timer === 1 || ((xff0f & 0b100) >> 2) === 1) {
+    if (throw_timer === 1 || ((new_xff0f & 0b100) >> 2) === 1) {
         if (IME && ((xffff & 0b100) >> 2) === 1) {
             xff0f &= 0b0001_1011;
             throw_timer = 0;
@@ -4754,9 +4762,11 @@ function interrupt_handle() {
         }else {
             xff0f |= 0b0000_0100;
         }
+    }else {
+        xff0f &= 0b0001_1011;
     }
     //throw serial transfer complete (ingored)
-    if (((xff0f & 0b1000) >> 3) === 1) {
+    if (((new_xff0f & 0b1000) >> 3) === 1) {
         if (IME && ((xffff & 0b1000) >> 3) === 1) {
             xff0f &= 0b0001_0111;
             stackpushb16(split_b16(pos));
@@ -4768,8 +4778,10 @@ function interrupt_handle() {
         }else {
             xff0f |= 0b0000_1000;
         }
+    }else {
+        xff0f &= 0b0001_0111;
     }
-    if (throw_pchange === 1 || ((xff0f & 0b1_0000) >> 4) === 1) {
+    if (throw_pchange === 1 || ((new_xff0f & 0b1_0000) >> 4) === 1) {
         if (IME && ((xffff & 0b1_0000) >> 4) === 1) {
             xff0f &= 0b0000_1111;
             throw_pchange = 0;
@@ -4782,9 +4794,12 @@ function interrupt_handle() {
         }else {
             xff0f |= 0b0001_0000;
         }
+    }else {
+        xff0f &= 0b0000_1111;
     }
 
     write(0xff0f, xff0f, 0);
+    old_xff0f = xff0f;
 }
 
 function disp_condition(orgpos) {
