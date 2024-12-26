@@ -344,11 +344,12 @@ read_directory = function() {
     }else {
         let keybind_reader = new FileReader();
         keybind_reader.onload = function () {
-            let keys = this.result.split("\n");
+            let keys = this.result.split(/\r?\n/);
             for (let i = 0; i < keys.length; i++) {
                 keybindings[i] = keys[i];
                 temp_keybind[i] = keys[i];
             }
+            console.log(keybindings);
         };
         keybind_reader.readAsText(keybind_file);
     }

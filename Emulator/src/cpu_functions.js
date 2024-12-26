@@ -4714,9 +4714,9 @@ function interrupt_handle() {
     let xffff = read(0xffff, 0);
 
     if (throw_vblank === 1 || (xff0f & 1) === 1) {
+        throw_vblank = 0;
         if (IME && (xffff & 1) === 1) {
             xff0f &= 0b0001_1110;
-            throw_vblank = 0;
             stackpushb16(split_b16(pos));
             pos = 0x40;
             IME = false;
@@ -4724,7 +4724,7 @@ function interrupt_handle() {
             // console.log("V-Blank Interrupt thrown");
             stopped = false;
         }else {
-            xff0f |= 0b0000_0001;
+            // xff0f |= 0b0000_0001;
         }
     }
     if (throw_lcdc === 1 || ((xff0f & 0b10) >> 1) === 1) {
