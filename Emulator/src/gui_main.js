@@ -27,6 +27,7 @@ class Menu {
         this.selected = 0;
         this.next_key_grabbed = false;
         this.on_next_key = function() {};
+        this.higlight_index = -1;
     }
     draw_self() {
         m_ctx.fillStyle = "rgb(200, 200, 200)";
@@ -47,6 +48,13 @@ class Menu {
                 }
                 m_ctx.fillStyle = "rgb(0, 0, 0)";
                 m_ctx.fillText(this.entries[i], 34*scale, (47+(i*12))*scale);
+                if (i === this.higlight_index) {
+                    m_ctx.fillStyle = "rgba(50, 50, 50, 0.5)";
+                    m_ctx.fillRect(0, 0, 32*scale, 144*scale);
+                    m_ctx.fillRect((96+32)*scale, 0, (160-96-32)*scale, 144*scale);
+                    m_ctx.fillRect(32*scale, 0, 96*scale, (40+(i*12))*scale);
+                    m_ctx.fillRect(32*scale, ((40+(i*12))*scale)+(10*scale), 96*scale, (144*scale)-(((40+(i*12))*scale)+(10*scale)));
+                }
             }
         }else {
             for (let i = 0; i < this.entries.length; i++) {
@@ -56,6 +64,13 @@ class Menu {
                 }
                 m_ctx.fillStyle = "rgb(0, 0, 0)";
                 m_ctx.fillText(this.entries[i], 34*scale, (23+(i*12))*scale);
+                if (i === this.higlight_index) {
+                    m_ctx.fillStyle = "rgba(50, 50, 50, 0.5)";
+                    m_ctx.fillRect(0, 0, 32*scale, 144*scale);
+                    m_ctx.fillRect((96+32)*scale, 0, (160-96-32)*scale, 144*scale);
+                    m_ctx.fillRect(32*scale, 0, 96*scale, (16+(i*12))*scale);
+                    m_ctx.fillRect(32*scale, ((16+(i*12))*scale)+(10*scale), 96*scale, (144*scale)-(((16+(i*12))*scale)+(10*scale)));
+                }
             }
         }
     }
@@ -123,6 +138,7 @@ function set_keybind() {};
 function save_keybinds() {};
 function trigger_change_resolution() {};
 function change_resolution() {};
+function toggle_run_boot_rom() {};
 function apply_settings() {};
 
 function relinquish_control() {};
@@ -140,6 +156,7 @@ let registered_games = [];
 // keybindings (from cpu_functions)
 let temp_keybind = Array.from(keybindings);
 let temp_scale = 4;
+let temp_run_boot_rom = true;
 
 let rom_path = "";
 let ram_path = "";
@@ -250,7 +267,7 @@ setup_register_rom = function() {
         [{none:true}, {none:true}, {none:true}, {none:true}]);
 };
 setup_edit_game = function() {
-    m_menu = new Menu("Select an action.", ["Wipe RAM", "Forget Game"], [setup_select_game, setup_select_game], [{wipe_ram: true, forget: false}, {wipe_ram: false, forget: true}]);
+    m_menu = new Menu("Select an action.", ["Wipe RAM", "Forget Game", "Cancel"], [setup_select_game, setup_select_game, setup_main_menu], [{wipe_ram: true, forget: false}, {wipe_ram: false, forget: true}, {none: true}]);
 };
 setup_select_game = function(args) {
     let action = undefined;
@@ -291,9 +308,9 @@ setup_reload_emulator = function() {
     m_menu = new Menu("Game has been registered.\nReload the emulator to continue.", [], [], []);
 };
 setup_options = function(selected=0) {
-    m_menu = new Menu("Options", ["Screen Scale: "+temp_scale, "Cancel", "Apply"],
-        [trigger_change_resolution, setup_main_menu, apply_settings],
-        [{none:true}, {none:true}, {none:true}]);
+    m_menu = new Menu("Options", ["Screen Scale: "+temp_scale, "Run Boot ROM: "+temp_run_boot_rom, "Cancel", "Apply"],
+        [trigger_change_resolution, toggle_run_boot_rom, setup_main_menu, apply_settings],
+        [{none:true}, {none:true}, {none:true}, {none:true}]);
     m_menu.selected = selected;
 };
 
@@ -330,7 +347,7 @@ read_directory = function() {
     }else {
         let reg_games_reader = new FileReader();
         reg_games_reader.onload = function () {
-            let games = this.result.split("\n");
+            let games = this.result.split(/\r?\n/);
             for (let i = 0; i < games.length; i++) {
                 registered_games.push(JSON.parse(games[i]));
             }
@@ -352,6 +369,27 @@ read_directory = function() {
             console.log(keybindings);
         };
         keybind_reader.readAsText(keybind_file);
+    }
+    let settings_file = get_file("settings.txt");
+    if (settings_file === "no such file") {
+        saveInDirectoryComplete = function() {};
+        createFileInDirectory(DirectoryHandle, "Emulator Settings", "settings.txt", "");
+    }else {
+        let settings_reader = new FileReader();
+        settings_reader.onload = function () {
+            let sett = this.result.split(/\r?\n/);
+            if (Number.isInteger(parseInt(sett[0]))) {
+                temp_scale = parseInt(sett[0]);
+            }
+            if (sett[1] === "false") {
+                temp_run_boot_rom = false;
+            }else {
+                temp_run_boot_rom = true;
+            }
+
+            apply_settings(false);
+        };
+        settings_reader.readAsText(settings_file);
     }
 };
 function read_romname(rom) {
@@ -617,6 +655,7 @@ let bind_slot = 0;
 trigger_set_keybind = function(args) {
     bind_slot = args.bind_to;
     m_menu.next_key_grabbed = true;
+    m_menu.higlight_index = args.bind_to;
     m_menu.on_next_key = set_keybind;
 };
 set_keybind = function(key) {
@@ -643,18 +682,35 @@ save_keybinds = function() {
 trigger_change_resolution = function() {
     m_menu.next_key_grabbed = true;
     m_menu.on_next_key = change_resolution;
+    m_menu.higlight_index = 0;
 };
 change_resolution = function(key) {
     temp_scale = parseInt(key);
     // console.log(parseInt(key));
     setup_options(m_menu.selected);
 };
-apply_settings = function() {
+toggle_run_boot_rom = function() {
+    temp_run_boot_rom = !temp_run_boot_rom;
+    setup_options(m_menu.selected);
+};
+apply_settings = function(write_file=true) {
     scale = temp_scale;
     m_canv.outerHTML = "<canvas width='" + (160 * scale).toString() + "' height='" + (144 * scale).toString() + "' id='display'></canvas>";
     m_canv = document.getElementById("display");
     m_ctx = m_canv.getContext("2d");
-    setup_main_menu();
+
+    run_boot_rom = temp_run_boot_rom;
+
+    if (!write_file) {
+        setup_main_menu();
+    }else {
+        let to_save = scale+"\n"+run_boot_rom+"\n";
+        setup_writing_file();
+        saveInDirectoryComplete = function() {
+            setup_main_menu();
+        };
+        saveToFileInDirectory(DirectoryHandle, "Emulator Settings", "settings.txt", to_save);
+    }
 };
 
 let go = 3;
