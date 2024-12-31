@@ -13,6 +13,11 @@ Features:
  * Support for both RAM and Save State saves
  * Runs most tested games
 
+Known Glitches:
+ * Sound staccato or absent in certain games
+ * Some error running MBC5 carts?
+ * Intro cutscenes and status bars absent in a few games
+
 You must provide your own ROMs.
 
 Known functioning games:

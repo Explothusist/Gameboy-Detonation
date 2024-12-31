@@ -76,6 +76,8 @@ let square_2_enable_written = false;
 let wave_table_enable_written = false;
 let noise_enable_written = false;
 
+function sound_handle_write_to_xff(XFF) {return XFF;};
+
 let cart_rom_size = 0;
 let cart_ram_size = 0;
 
@@ -1015,24 +1017,6 @@ function write(pos, val, message = 1) {
                 //Div Timer
                 XFF00[4] = 0;
                 DIV_last_reset = {fram: frames, cycle: cycles};
-            // }else if (pos === 0xff11) {
-            //     //NR11 Length Counter
-            //     val &= 0b1100_0000;
-            //     val |= 0b0011_1111;
-            //     XFF00[0x11] = val;
-            // } else if (pos === 0xff16) {
-            //     //NR21 Length Counter
-            //     val &= 0b1100_0000;
-            //     val |= 0b0011_1111;
-            //     XFF00[0x16] = val;
-            // } else if (pos === 0xff1b) {
-            //     //NR31 Length Counter
-            //     XFF00[0x1b] = 0b1111_1111;
-            // } else if (pos === 0xff20) {
-            //     //NR21 Length Counter
-            //     val &= 0b1100_0000;
-            //     val |= 0b0011_1111;
-            //     XFF00[0x20] = val;
             } else if (pos === 0xff46) {
                 //DMA Transfer
                 XFF00[0x46] = val;
@@ -1044,24 +1028,9 @@ function write(pos, val, message = 1) {
             } else {
                 XFF00[pos - 0xff00] = val;
             }
-            if (pos === 0xff14) {
-                square_1_enable_written = true;
-            }
-            if (pos === 0xff19) {
-                square_2_enable_written = true;
-            }
-            if (pos === 0xff1e) {
-                wave_table_enable_written = true;
-            }
-            if (pos === 0xff23) {
-                noise_enable_written = true;
-            }
 
-            if (pos === 0xff26) {
-                if (((val & 0b1000_0000) >> 7) === 0) {
-                    XFF00 = clear_all_sound_registers(XFF00);
-                }
-            }
+            XFF00 = sound_handle_write_to_xff(XFF00, pos, val);
+
             return;
         } else if (pos < 0xff80) {
             // Used once (Boot ROM)

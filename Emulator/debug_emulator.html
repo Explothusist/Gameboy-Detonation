@@ -11,21 +11,12 @@
 
     <canvas width="160" height="144" id="display"></canvas>
 
-    <!-- <label for="gamerom">Game ROM File:</label> -->
-    <!-- <input type="file" id="gamerom" /> -->
-    <!-- <button id="engage">Engage Explosives</button> -->
-    <!-- <input type="file" id="gameram" /> -->
-    <!-- <button id="load">No RAM</button> -->
-    <!-- <button id="prepare">Prepare Fuse</button> -->
     <div>
       <button id="begin">Detonate!</button>
       <button id="reset">Reset</button>
       <button id="saveram">Save RAM</button>
+      <button id="savestate">Save State</button>
     </div>
-    <!-- <button id="savenewram">Save New RAM</button> -->
-    <!-- <button id="savestate">Save State</button> -->
-    <!-- <input type="file" id="statetoload" /> -->
-    <!-- <button id="loadstate">Load State</button> -->
 
     <h4></h4>
     <div>
@@ -37,7 +28,6 @@
       <!-- <label for="data_dir">Emulator Data Directory</label> -->
       <!-- <input type="file" id="data_dir" webkitdirectory></input> -->
     </div>
-    
     <div>
       <label for="throttle_speed">Emulator Speed: </label>
       <input type="number" id="throttle_speed" step="10" value="100">
@@ -50,14 +40,29 @@
     <h4></h4>
 
     <div>
-      <!-- <button id="step">Single Step</button> -->
-      <!-- <input type="number" id="val" /> -->
-      <!-- <button id="shortrun">Run for Cycles</button> -->
-      <input type="number" id="log_pos" value="1" max="50" min="1" />
-      <button id="log_run">Error Log</button>
-      <button id="log_run_back">Error Log Backward</button>
-      <input type="checkbox" id="dump" disabled/>
-      <!-- <label for="checkbox">Dump Instructions</label> -->
+        <label for="gamerom">Game ROM File:</label>
+        <input type="file" id="gamerom" />
+    </div>
+    <div>
+        <label for="gamerom">Save RAM File:</label>
+        <input type="file" id="gameram" />
+    </div>
+    <div>
+        <label for="statetoload">Save State:</label>
+        <input type="file" id="statetoload" />
+    </div>
+    <button id="prepare">Load Game</button>
+
+    <h4></h4>
+    <div>
+        <button id="step">Single Step</button>
+        <input type="number" id="val" />
+        <button id="shortrun">Run for Cycles</button>
+        <input type="number" id="log_pos" value="1" max="50" min="1" />
+        <button id="log_run">Error Log</button>
+        <button id="log_run_back">Error Log Backward</button>
+        <input type="checkbox" id="dump"/>
+        <label for="checkbox">Dump Instructions</label>
     </div>
 
     <h4>Toggle Sound Channels</h4>
@@ -94,6 +99,6 @@
     <script src="src/sound.js"></script>
     <script src="src/joysitck.js"></script>
     <script src="src/cpu_functions.js"></script>
-    <script src="src/gui_main.js"></script>
+    <script src="src/debug_main.js"></script>
   </body>
 </html>
